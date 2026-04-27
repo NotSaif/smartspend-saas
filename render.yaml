@@ -1,0 +1,28 @@
+services:
+  # Backend API (Node.js + Express)
+  - type: web
+    name: smartspend-api
+    env: node
+    region: singapore
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smartspend-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CLIENT_URL
+        value: https://smartspend.vercel.app
+
+databases:
+  - name: smartspend-db
+    databaseName: smartspend
+    region: singapore
+    plan: free

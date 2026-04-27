@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-navy-900 text-white font-sans;
+    min-height: 100vh;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0F1F3D;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2563EB;
+    border-radius: 3px;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-navy-800 border border-white/10 rounded-2xl shadow-xl backdrop-blur-sm;
+  }
+  .btn-primary {
+    @apply bg-brand-500 hover:bg-brand-400 text-white font-semibold px-4 py-2 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-brand-500/25 active:scale-95;
+  }
+  .btn-ghost {
+    @apply bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-medium px-4 py-2 rounded-xl transition-all duration-200 active:scale-95;
+  }
+  .btn-danger {
+    @apply bg-coral-500 hover:bg-coral-400 text-white font-semibold px-4 py-2 rounded-xl transition-all duration-200 active:scale-95;
+  }
+  .input-field {
+    @apply bg-navy-700 border border-white/10 text-white placeholder-white/30 rounded-xl px-4 py-2.5 w-full focus:outline-none focus:border-brand-500 transition-colors duration-200;
+  }
+  .stat-card {
+    @apply glass-card p-6 hover:border-brand-500/30 transition-all duration-300 hover:shadow-brand-500/10 hover:shadow-2xl;
+  }
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:text-white hover:bg-white/5 transition-all duration-200 cursor-pointer font-medium;
+  }
+  .nav-link.active {
+    @apply text-white bg-brand-500/20 border border-brand-500/30;
+  }
+  .badge {
+    @apply text-xs font-semibold px-2.5 py-1 rounded-full;
+  }
+  .table-row {
+    @apply border-b border-white/5 hover:bg-white/3 transition-colors duration-150;
+  }
+}
+
+@layer utilities {
+  .bg-white\/3 {
+    background-color: rgba(255,255,255,0.03);
+  }
+  .text-gradient {
+    background: linear-gradient(135deg, #3B82F6, #10B981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(37,99,235,0.3);
+  }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease forwards;
+}
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease forwards;
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
