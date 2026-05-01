@@ -42,8 +42,7 @@ const seedDefaultCategories = async (companyId) => {
   for (const c of DEFAULT_CATEGORIES) {
     await pool.query(
       `INSERT INTO categories (name, type, color, icon, company_id)
-       VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT DO NOTHING`,
+       VALUES ($1,$2,$3,$4,$5)`,
       [c.name, c.type, c.color, c.icon, companyId]
     );
   }

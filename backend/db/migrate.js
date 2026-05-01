@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS companies (
   name        VARCHAR(150) NOT NULL,
   industry    VARCHAR(100),
   location    VARCHAR(100),
+  is_demo     BOOLEAN NOT NULL DEFAULT FALSE,
   created_at  TIMESTAMP DEFAULT NOW()
 );
 
