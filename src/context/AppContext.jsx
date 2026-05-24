@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from '../components/Toast';
-import { transactionsAPI, budgetsAPI, categoriesAPI, usersAPI, companiesAPI } from '../services/api';
+import { transactionsAPI, budgetsAPI, categoriesAPI, usersAPI, companiesAPI, anomaliesAPI } from '../services/api';
 import {
   transactions as mockTx,
   budgets as mockBudgets,
@@ -19,7 +19,11 @@ export function AppProvider({ children }) {
   const [categories, setCategories]     = useState([]);
   const [users, setUsers]               = useState([]);
   const [companies, setCompanies]       = useState([]);
+  const [anomalies, setAnomalies]       = useState([]);
   const [loading, setLoading]           = useState(true);
+
+  // Set of anomalous transaction IDs for O(1) lookup in the UI
+  const anomalyIds = useMemo(() => new Set(anomalies.map(a => a.id)), [anomalies]);
 
   // ── Load data ────────────────────────────────────────────────
   const loadAll = useCallback(async () => {
@@ -46,6 +50,12 @@ export function AppProvider({ children }) {
           const usrRes = await usersAPI.getAll();
           setUsers(usrRes.data.map(normalizeUser));
         } catch { setUsers(mockUsers); }
+
+        // Load anomalies (best-effort — requires company context)
+        try {
+          const anoRes = await anomaliesAPI.getAll();
+          setAnomalies(anoRes.data);
+        } catch { setAnomalies([]); }
       } catch (err) {
         console.warn('API load failed, falling back to mock data', err);
         loadMock();
@@ -62,6 +72,7 @@ export function AppProvider({ children }) {
     setCategories(mockCats);
     setUsers(mockUsers);
     setCompanies(mockCompanies);
+    setAnomalies([]);
   };
 
   useEffect(() => { loadAll(); }, [loadAll]);
@@ -76,6 +87,7 @@ export function AppProvider({ children }) {
     categoryId: t.category_id ?? t.categoryId,
     companyId: t.company_id ?? t.companyId,
     userId: t.user_id ?? t.userId,
+    receiptUrl: t.receipt_url ?? t.receiptUrl ?? null,
     categoryName: t.category_name, categoryColor: t.category_color, categoryIcon: t.category_icon,
   });
   const normalizeBudget = (b) => ({
@@ -101,9 +113,11 @@ export function AppProvider({ children }) {
         const res = await transactionsAPI.create({
           amount: data.amount, date: data.date, type: data.type,
           description: data.description, paymentMethod: data.paymentMethod,
-          categoryId: data.categoryId,
+          categoryId: data.categoryId, receiptUrl: data.receiptUrl || null,
         });
         setTransactions(p => [normalizeTx(res.data), ...p]);
+        // Refresh anomalies after adding a transaction
+        try { const anoRes = await anomaliesAPI.getAll(); setAnomalies(anoRes.data); } catch {}
         toast.success('Transaction saved to database!');
       } catch (err) { toast.error('Failed to save: ' + err.message); }
     } else {
@@ -119,9 +133,10 @@ export function AppProvider({ children }) {
         const res = await transactionsAPI.update(id, {
           amount: data.amount, date: data.date, type: data.type,
           description: data.description, paymentMethod: data.paymentMethod,
-          categoryId: data.categoryId,
+          categoryId: data.categoryId, receiptUrl: data.receiptUrl || null,
         });
         setTransactions(p => p.map(t => t.id === id ? normalizeTx(res.data) : t));
+        try { const anoRes = await anomaliesAPI.getAll(); setAnomalies(anoRes.data); } catch {}
         toast.success('Transaction updated.');
       } catch (err) { toast.error('Update failed: ' + err.message); }
     } else {
@@ -135,6 +150,7 @@ export function AppProvider({ children }) {
       try {
         await transactionsAPI.delete(id);
         setTransactions(p => p.filter(t => t.id !== id));
+        setAnomalies(p => p.filter(a => a.id !== id));
         toast.warning('Transaction deleted.');
       } catch (err) { toast.error('Delete failed: ' + err.message); }
     } else {
@@ -257,6 +273,7 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       transactions, budgets, categories, users, companies, loading,
+      anomalies, anomalyIds,
       addTransaction, updateTransaction, deleteTransaction,
       addBudget, updateBudget, deleteBudget,
       addCategory, updateCategory, deleteCategory,

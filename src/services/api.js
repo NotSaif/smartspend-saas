@@ -98,3 +98,28 @@ export const reportsAPI = {
   byCategory: (year, month)   => request('GET', `/reports/by-category?year=${year}${month ? `&month=${month}` : ''}`),
   summary:    (month, year)   => request('GET', `/reports/summary?month=${month}&year=${year}`),
 };
+
+// ── Anomaly Detection ─────────────────────────────────────────
+
+export const anomaliesAPI = {
+  getAll: () => request('GET', '/anomalies'),
+};
+
+// ── Receipt OCR ───────────────────────────────────────────────
+// Uses FormData (multipart) — no Content-Type header so browser sets boundary.
+
+export const receiptsAPI = {
+  ocr: (file) => {
+    const formData = new FormData();
+    formData.append('receipt', file);
+    return fetch(`${BASE_URL}/receipts/ocr`, {
+      method: 'POST',
+      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+      body: formData,
+    }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'OCR failed');
+      return data;
+    });
+  },
+};

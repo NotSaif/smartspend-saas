@@ -8,7 +8,10 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import StatCard from '../components/StatCard';
 import BudgetBar from '../components/BudgetBar';
-import { DollarSign, TrendingDown, TrendingUp, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import {
+  DollarSign, TrendingDown, TrendingUp, Wallet,
+  ArrowUpRight, ArrowDownRight, AlertTriangle,
+} from 'lucide-react';
 import { MONTH_NAMES } from '../data/mockData';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
@@ -16,12 +19,15 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 const fmtBHD = (n) => `BHD ${n.toFixed(3)}`;
 
 export default function Dashboard() {
-  const { transactions, budgets, categories, companies, getCategorySpending, getMonthlySummary } = useApp();
+  const {
+    transactions, budgets, categories, companies,
+    getCategorySpending, getMonthlySummary, anomalies,
+  } = useApp();
   const { currentUser } = useAuth();
 
   const now = new Date();
   const month = now.getMonth() + 1;
-  const year = now.getFullYear();
+  const year  = now.getFullYear();
   const companyId = currentUser?.companyId ?? null;
 
   // Resolve company name
@@ -31,80 +37,64 @@ export default function Dashboard() {
   // Monthly summary
   const { income, expenses, net } = getMonthlySummary(month, year, companyId);
   const prevMonth = month === 1 ? 12 : month - 1;
-  const prevYear = month === 1 ? year - 1 : year;
-  const prev = getMonthlySummary(prevMonth, prevYear, companyId);
-  const incTrend = prev.income > 0 ? Math.round(((income - prev.income) / prev.income) * 100) : 0;
-  const expTrend = prev.expenses > 0 ? Math.round(((expenses - prev.expenses) / prev.expenses) * 100) : 0;
+  const prevYear  = month === 1 ? year - 1 : year;
+  const prev      = getMonthlySummary(prevMonth, prevYear, companyId);
+  const incTrend  = prev.income   > 0 ? Math.round(((income   - prev.income)   / prev.income)   * 100) : 0;
+  const expTrend  = prev.expenses > 0 ? Math.round(((expenses - prev.expenses) / prev.expenses) * 100) : 0;
 
   // Budget usage
-  const myBudgets = budgets.filter(b =>
+  const myBudgets  = budgets.filter(b =>
     (companyId === null || b.companyId === companyId) && b.month === month && b.year === year
   );
   const totalBudget = myBudgets.reduce((s, b) => s + b.amount, 0);
   const totalSpent  = myBudgets.reduce((s, b) => s + getCategorySpending(b.categoryId, month, year, companyId), 0);
   const budgetPct   = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
 
-  // Expense by category (doughnut)
-  const expCats = categories.filter(c => c.type === 'expense' && (companyId === null || c.companyId === companyId || !c.companyId));
+  // Expense categories (memoised to keep doughnut stable)
+  const expCats = useMemo(
+    () => categories.filter(c => c.type === 'expense' && (companyId === null || c.companyId === companyId || !c.companyId)),
+    [categories, companyId]
+  );
+
+  // Doughnut — spending by category this month
   const doughnutData = useMemo(() => {
-    const amounts = expCats.map(c =>
-      transactions
-        .filter(t => t.categoryId === c.id && t.type === 'expense' &&
-          new Date(t.date).getMonth() + 1 === month &&
-          new Date(t.date).getFullYear() === year)
-        .reduce((s, t) => s + t.amount, 0)
-    ).filter((_, i) => {
-      return transactions.some(t => t.categoryId === expCats[i]?.id && t.type === 'expense' &&
-        new Date(t.date).getMonth() + 1 === month && new Date(t.date).getFullYear() === year);
-    });
-    const cats = expCats.filter((_, i) =>
-      transactions.some(t => t.categoryId === expCats[i]?.id && t.type === 'expense' &&
-        new Date(t.date).getMonth() + 1 === month && new Date(t.date).getFullYear() === year)
+    const withData = expCats.filter(c =>
+      transactions.some(t =>
+        t.categoryId === c.id && t.type === 'expense' &&
+        new Date(t.date).getMonth() + 1 === month &&
+        new Date(t.date).getFullYear() === year
+      )
     );
     return {
-      labels: cats.map(c => c.name),
+      labels: withData.map(c => c.name),
       datasets: [{
-        data: cats.map(c =>
+        data: withData.map(c =>
           transactions
             .filter(t => t.categoryId === c.id && t.type === 'expense' &&
-              new Date(t.date).getMonth() + 1 === month && new Date(t.date).getFullYear() === year)
+              new Date(t.date).getMonth() + 1 === month &&
+              new Date(t.date).getFullYear() === year)
             .reduce((s, t) => s + t.amount, 0)
         ),
-        backgroundColor: cats.map(c => c.color + 'CC'),
-        borderColor: cats.map(c => c.color),
+        backgroundColor: withData.map(c => c.color + 'CC'),
+        borderColor:     withData.map(c => c.color),
         borderWidth: 1,
       }],
     };
   }, [transactions, expCats, month, year]);
 
-  // Monthly income vs expenses (last 4 months bar)
+  // Bar — income vs expenses last 4 months
   const last4 = Array.from({ length: 4 }, (_, i) => {
-    const m = month - 3 + i;
-    const y = m <= 0 ? year - 1 : year;
+    const m    = month - 3 + i;
+    const y    = m <= 0 ? year - 1 : year;
     const adjM = m <= 0 ? m + 12 : m;
-    const s = getMonthlySummary(adjM, y, companyId);
-    return { label: MONTH_NAMES[adjM - 1].slice(0, 3), ...s };
+    return { label: MONTH_NAMES[adjM - 1].slice(0, 3), ...getMonthlySummary(adjM, y, companyId) };
   });
 
   const barData = {
     labels: last4.map(m => m.label),
     datasets: [
-      {
-        label: 'Income',
-        data: last4.map(m => m.income),
-        backgroundColor: '#10B98180',
-        borderColor: '#10B981',
-        borderWidth: 1,
-        borderRadius: 6,
-      },
-      {
-        label: 'Expenses',
-        data: last4.map(m => m.expenses),
-        backgroundColor: '#EF444480',
-        borderColor: '#EF4444',
-        borderWidth: 1,
-        borderRadius: 6,
-      },
+      { label: 'Income',   data: last4.map(m => m.income),   backgroundColor: '#10B98180', borderColor: '#10B981', borderWidth: 1, borderRadius: 6 },
+      { label: 'Expenses', data: last4.map(m => m.expenses), backgroundColor: '#EF444480', borderColor: '#EF4444', borderWidth: 1, borderRadius: 6 },
     ],
   };
 
@@ -114,11 +104,8 @@ export default function Dashboard() {
     plugins: {
       legend: { labels: { color: 'rgba(255,255,255,0.6)', font: { family: 'Inter', size: 12 } } },
       tooltip: {
-        backgroundColor: '#0F1F3D',
-        borderColor: 'rgba(255,255,255,0.1)',
-        borderWidth: 1,
-        titleColor: '#fff',
-        bodyColor: 'rgba(255,255,255,0.6)',
+        backgroundColor: '#0F1F3D', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+        titleColor: '#fff', bodyColor: 'rgba(255,255,255,0.6)',
       },
     },
     scales: {
@@ -139,7 +126,11 @@ export default function Dashboard() {
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           Financial Dashboard
-          {company?.is_demo && <span className="badge bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] px-1.5 py-0.5 uppercase tracking-wider font-bold rounded">DEMO ACCOUNT</span>}
+          {company?.is_demo && (
+            <span className="badge bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] px-1.5 py-0.5 uppercase tracking-wider font-bold rounded">
+              DEMO ACCOUNT
+            </span>
+          )}
         </h1>
         <p className="text-white/40 text-sm mt-1">{MONTH_NAMES[month - 1]} {year} · {companyName}</p>
       </div>
@@ -154,14 +145,12 @@ export default function Dashboard() {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Bar chart — 3/3 on mobile, 2/3 on lg */}
         <div className="lg:col-span-2 glass-card p-6">
           <h2 className="text-base font-semibold text-white mb-4">Income vs Expenses — Last 4 Months</h2>
           <div className="h-56">
             <Bar data={barData} options={chartOptions} />
           </div>
         </div>
-        {/* Doughnut */}
         <div className="glass-card p-6">
           <h2 className="text-base font-semibold text-white mb-4">Spending by Category</h2>
           <div className="h-56 flex items-center justify-center">
@@ -181,6 +170,52 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ── Anomaly Alerts ──────────────────────────────────────── */}
+      {anomalies.length > 0 && (
+        <div className="glass-card p-6 border border-amber-500/20">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center">
+              <AlertTriangle size={16} className="text-amber-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-white">Anomaly Alerts</h2>
+              <p className="text-xs text-white/40">Expenses that significantly exceed your historical category average</p>
+            </div>
+            <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              {anomalies.length} flagged
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {anomalies.slice(0, 5).map(a => (
+              <div key={a.id} className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10 hover:border-amber-500/25 transition-colors">
+                <span className="text-xl flex-shrink-0">{a.category_icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{a.description}</p>
+                  <p className="text-xs text-white/40">
+                    {a.category_name} · {a.date}
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-sm font-bold text-amber-400">BHD {parseFloat(a.amount).toFixed(3)}</p>
+                  <p className="text-xs text-white/40">
+                    {parseFloat(a.ratio).toFixed(1)}× avg (BHD {parseFloat(a.avg_amount).toFixed(3)})
+                  </p>
+                </div>
+                <div className="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle size={11} className="text-amber-400" />
+                </div>
+              </div>
+            ))}
+            {anomalies.length > 5 && (
+              <p className="text-xs text-white/30 text-center pt-1">
+                +{anomalies.length - 5} more flagged transactions — check the Transactions page
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Budget bars */}
       <div>
         <h2 className="text-base font-semibold text-white mb-3">Budget Status — {MONTH_NAMES[month - 1]}</h2>
@@ -188,7 +223,7 @@ export default function Dashboard() {
           {budgets
             .filter(b => (companyId === null || b.companyId === companyId) && b.month === month && b.year === year)
             .map(b => {
-              const cat = categories.find(c => c.id === b.categoryId);
+              const cat   = categories.find(c => c.id === b.categoryId);
               if (!cat) return null;
               const spent = getCategorySpending(b.categoryId, month, year, companyId);
               return <BudgetBar key={b.id} category={cat} spent={spent} budget={b.amount} />;

@@ -2,49 +2,68 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import TransactionModal from '../components/TransactionModal';
-import { Plus, Search, Edit2, Trash2, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, ArrowUpRight, ArrowDownRight, AlertTriangle } from 'lucide-react';
 
 export default function Transactions() {
-  const { transactions, categories, deleteTransaction } = useApp();
+  const { transactions, categories, deleteTransaction, anomalyIds } = useApp();
   const { currentUser, canEdit } = useAuth();
 
-  const [modal, setModal] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterCat, setFilterCat] = useState('all');
+  const [modal, setModal]               = useState(false);
+  const [editing, setEditing]           = useState(null);
+  const [search, setSearch]             = useState('');
+  const [filterType, setFilterType]     = useState('all');
+  const [filterCat, setFilterCat]       = useState('all');
   const [filterMethod, setFilterMethod] = useState('all');
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  const companyId = currentUser?.companyId || 1;
-  const userTx = transactions.filter(t => t.companyId === companyId);
+  // Admin (companyId = null) sees all transactions
+  const companyId = currentUser?.companyId ?? null;
+  const userTx    = companyId !== null
+    ? transactions.filter(t => t.companyId === companyId)
+    : transactions;
 
   const filtered = userTx.filter(t => {
-    if (filterType !== 'all' && t.type !== filterType) return false;
-    if (filterCat !== 'all' && t.categoryId !== parseInt(filterCat)) return false;
-    if (filterMethod !== 'all' && t.paymentMethod !== filterMethod) return false;
+    if (filterType   !== 'all' && t.type             !== filterType)          return false;
+    if (filterCat    !== 'all' && t.categoryId       !== parseInt(filterCat)) return false;
+    if (filterMethod !== 'all' && t.paymentMethod    !== filterMethod)        return false;
     if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const totalIncome = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalIncome   = filtered.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
   const totalExpenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const anomalyCount  = filtered.filter(t => anomalyIds.has(t.id)).length;
 
   const handleDelete = (id) => {
     deleteTransaction(id);
     setConfirmDelete(null);
   };
 
+  // Categories scoped to the current user's company (or all if admin)
+  const myCats = companyId !== null
+    ? categories.filter(c => c.companyId === companyId)
+    : categories;
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Transactions</h1>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            Transactions
+            {anomalyCount > 0 && (
+              <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold">
+                <AlertTriangle size={10} /> {anomalyCount} anomal{anomalyCount === 1 ? 'y' : 'ies'}
+              </span>
+            )}
+          </h1>
           <p className="text-white/40 text-sm mt-1">{filtered.length} records · {userTx.length} total</p>
         </div>
         {canEdit && (
-          <button onClick={() => { setEditing(null); setModal(true); }} className="btn-primary flex items-center gap-2">
+          <button
+            onClick={() => { setEditing(null); setModal(true); }}
+            className="btn-primary flex items-center gap-2"
+          >
             <Plus size={16} /> Add Transaction
           </button>
         )}
@@ -53,8 +72,8 @@ export default function Transactions() {
       {/* Summary row */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Filtered Income',   value: totalIncome,               color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: ArrowUpRight },
-          { label: 'Filtered Expenses', value: totalExpenses,             color: 'text-coral-400',   bg: 'bg-coral-500/10',   icon: ArrowDownRight },
+          { label: 'Filtered Income',   value: totalIncome,                color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: ArrowUpRight },
+          { label: 'Filtered Expenses', value: totalExpenses,              color: 'text-coral-400',   bg: 'bg-coral-500/10',   icon: ArrowDownRight },
           { label: 'Net',               value: totalIncome - totalExpenses, color: (totalIncome - totalExpenses) >= 0 ? 'text-emerald-400' : 'text-coral-400', bg: 'bg-white/5', icon: ArrowUpRight },
         ].map(({ label, value, color, bg, icon: Icon }) => (
           <div key={label} className={`glass-card p-4 flex items-center gap-3 ${bg}`}>
@@ -78,9 +97,9 @@ export default function Transactions() {
             />
           </div>
           {[
-            { label: 'Type',   value: filterType,   set: setFilterType,   opts: [['all','All Types'],['income','Income'],['expense','Expense']] },
-            { label: 'Category', value: filterCat, set: setFilterCat,   opts: [['all','All Categories'], ...categories.filter(c=>c.companyId===companyId).map(c=>[c.id, `${c.icon} ${c.name}`])] },
-            { label: 'Method', value: filterMethod, set: setFilterMethod, opts: [['all','All Methods'],['cash','Cash'],['card','Card'],['transfer','Transfer']] },
+            { label: 'Type',     value: filterType,   set: setFilterType,   opts: [['all','All Types'],['income','Income'],['expense','Expense']] },
+            { label: 'Category', value: filterCat,    set: setFilterCat,    opts: [['all','All Categories'], ...myCats.map(c => [c.id, `${c.icon} ${c.name}`])] },
+            { label: 'Method',   value: filterMethod, set: setFilterMethod, opts: [['all','All Methods'],['cash','Cash'],['card','Card'],['transfer','Transfer']] },
           ].map(({ label, value, set, opts }) => (
             <select key={label} value={value} onChange={e => set(e.target.value)} className="input-field w-auto text-sm py-2">
               {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -105,10 +124,20 @@ export default function Transactions() {
                 <tr><td colSpan={7} className="text-center py-12 text-white/20">No transactions found</td></tr>
               )}
               {filtered.map(t => {
-                const cat = categories.find(c => c.id === t.categoryId);
+                const cat      = categories.find(c => c.id === t.categoryId);
+                const isAnomal = anomalyIds.has(t.id);
                 return (
-                  <tr key={t.id} className="table-row">
-                    <td className="px-4 py-3 text-white/40 whitespace-nowrap">{t.date}</td>
+                  <tr key={t.id} className={`table-row ${isAnomal ? 'bg-amber-500/5' : ''}`}>
+                    <td className="px-4 py-3 text-white/40 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        {isAnomal && (
+                          <span title="Anomaly detected — this expense is unusually high for this category">
+                            <AlertTriangle size={12} className="text-amber-400 flex-shrink-0" />
+                          </span>
+                        )}
+                        {t.date}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-white/80 max-w-[200px] truncate">{t.description}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs px-2 py-1 rounded-full" style={{ background:(cat?.color||'#888')+'20', color: cat?.color||'#888' }}>
@@ -122,7 +151,7 @@ export default function Transactions() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">
-                      <span className={t.type==='income' ? 'text-emerald-400' : 'text-coral-400'}>
+                      <span className={t.type==='income' ? 'text-emerald-400' : isAnomal ? 'text-amber-400' : 'text-coral-400'}>
                         {t.type==='income' ? '+' : '-'}BHD {t.amount.toFixed(3)}
                       </span>
                     </td>

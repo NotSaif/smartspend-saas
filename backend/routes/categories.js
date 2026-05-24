@@ -48,8 +48,6 @@ const seedDefaultCategories = async (companyId) => {
   }
 };
 
-module.exports.seedDefaultCategories = seedDefaultCategories;
-
 // GET /api/categories
 router.get('/', async (req, res) => {
   try {
@@ -124,3 +122,4 @@ router.delete('/:id', authorize('admin', 'owner'), async (req, res) => {
 
 module.exports = router;
 module.exports.seedDefaultCategories = seedDefaultCategories;
+

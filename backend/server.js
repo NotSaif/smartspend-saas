@@ -10,6 +10,8 @@ const categoryRoutes     = require('./routes/categories');
 const userRoutes         = require('./routes/users');
 const reportRoutes       = require('./routes/reports');
 const companyRoutes      = require('./routes/companies');
+const anomalyRoutes      = require('./routes/anomalies');
+const receiptRoutes      = require('./routes/receipts');
 
 const app = express();
 
@@ -64,6 +66,8 @@ app.use('/api/categories',   categoryRoutes);
 app.use('/api/users',        userRoutes);
 app.use('/api/reports',      reportRoutes);
 app.use('/api/companies',    companyRoutes);
+app.use('/api/anomalies',    anomalyRoutes);
+app.use('/api/receipts',     receiptRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
