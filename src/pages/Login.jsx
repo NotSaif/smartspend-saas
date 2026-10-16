@@ -96,7 +96,7 @@ export default function Login({ mode = 'login' }) {
                     <label className="label">Company Name *</label>
                     <div className="relative">
                       <Building2 size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
-                      <input value={form.companyName} onChange={set('companyName')} placeholder="e.g. Al-Noor Bakery" className="input-field pl-10" required />
+                      <input value={form.companyName} onChange={set('companyName')} placeholder="e.g. Sunrise Bakery" className="input-field pl-10" required />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-4">
@@ -106,7 +106,7 @@ export default function Login({ mode = 'login' }) {
                     </div>
                     <div>
                       <label className="label">Your Full Name *</label>
-                      <input value={form.name} onChange={set('name')} placeholder="e.g. Mona Ali" className="input-field" autoComplete="name" required />
+                      <input value={form.name} onChange={set('name')} placeholder="e.g. Emma Brooks" className="input-field" autoComplete="name" required />
                     </div>
                   </div>
                 </>
@@ -151,7 +151,7 @@ export default function Login({ mode = 'login' }) {
 
             {!isRegister && (
               <div className="mt-6 border-t border-white/[0.06] pt-6">
-                <p className="mb-3 text-center text-xs text-white/35">Quick demo access — Al-Zain Trading Co.</p>
+                <p className="mb-3 text-center text-xs text-white/35">Quick demo access — General Trading Co.</p>
                 <div className="grid grid-cols-3 gap-2">
                   {DEMO_ACCOUNTS.map(({ label, email, password, color }) => (
                     <button key={label} type="button" onClick={() => quickFill(email, password)}

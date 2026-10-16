@@ -144,7 +144,7 @@ export default function Users() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="label">Full Name *</label>
-                <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Fatima Hassan" className="input-field" />
+                <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Jordan Lee" className="input-field" />
               </div>
               <div>
                 <label className="label">Email *</label>

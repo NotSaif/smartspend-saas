@@ -82,7 +82,7 @@ function ProductPreview() {
       </div>
       <div className="glass-strong absolute -right-10 -bottom-6 hidden w-60 items-center gap-3 !rounded-2xl p-3.5 text-left shadow-glow-cyan md:flex animate-float [animation-delay:-3s]">
         <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-300"><ScanLine size={17} /></span>
-        <div><p className="text-xs font-semibold text-white">Receipt scanned</p><p className="text-[11px] text-white/50">AL-OSRA · BHD 18.750</p></div>
+        <div><p className="text-xs font-semibold text-white">Receipt scanned</p><p className="text-[11px] text-white/50">City Supermarket · BHD 18.750</p></div>
       </div>
     </div>
   );
@@ -187,7 +187,7 @@ export default function LandingPage() {
             <h3 className="mt-5 font-display text-xl font-bold text-white">Receipt Scanning</h3>
             <p className="mt-2 text-sm leading-relaxed text-white/50">Upload a receipt photo and SmartSpend reads the vendor, total and date for you (OCR).</p>
             <div className="mt-6 rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-4 font-mono text-[11px] leading-6 text-white/55">
-              <p className="text-white/80">AL-OSRA SUPERMARKET</p>
+              <p className="text-white/80">CITY SUPERMARKET</p>
               <p>2026-10-12</p>
               <p className="flex justify-between"><span>SUBTOTAL</span><span>17.045</span></p>
               <p className="flex justify-between font-semibold text-cyan-300"><span>TOTAL BHD</span><span>18.750</span></p>
@@ -249,7 +249,7 @@ export default function LandingPage() {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-500/15 via-transparent to-cyan-500/10" />
           <div className="relative">
             <h2 className="font-display text-3xl font-extrabold tracking-tight text-white">Try the Demo</h2>
-            <p className="mb-8 mt-2 text-sm text-white/50">Explore the demo company Al-Zain Trading Co. with each access level</p>
+            <p className="mb-8 mt-2 text-sm text-white/50">Explore the demo company General Trading Co. with each access level</p>
             <div className="mb-8 grid grid-cols-1 gap-3 text-left md:grid-cols-3">
               {DEMO_ACCOUNTS.map(c => (
                 <div key={c.role} className={`rounded-2xl border bg-gradient-to-br to-transparent p-4 ${demoTint[c.color]}`}>

@@ -49,14 +49,14 @@ npm install
 npm run dev                   # → http://localhost:5173  (proxies /api to port 5000)
 ```
 
-## Demo Accounts (Al-Zain Trading Co.)
+## Demo Accounts (General Trading Co.)
 | Role | Email | Password |
 |------|-------|----------|
-| Business Owner | owner@alzain.bh | owner123 |
-| Administrator | admin@alzain.bh | admin123 |
-| Employee | accountant@alzain.bh | emp123 |
+| Business Owner (Alex Morgan) | owner@general.bh | owner123 |
+| Administrator (Max Carter) | admin@general.bh | admin123 |
+| Employee (Clara Hayes) | employee@general.bh | emp123 |
 
-A second demo company, **Gulf Tech Solutions** (`owner@gulftech.bh` / `owner123`), shows that tenants cannot see each other's data.
+A second demo company, **Bright Tech Solutions** (`owner@brighttech.bh` / `owner123`, Sam Wilson), shows that tenants cannot see each other's data.
 
 ---
 

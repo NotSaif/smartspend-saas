@@ -57,7 +57,7 @@ export default function Reports() {
   }).filter(c => c.total > 0).sort((a, b) => (a.type === b.type ? b.total - a.total : a.type === 'income' ? -1 : 1));
 
   const exportCSV = () => {
-    const company = (currentUser?.companyName || 'company').replace(/[^\w]+/g, '_');
+    const company = (currentUser?.companyName || 'company').replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '');
     if (view === 'monthly') {
       downloadCSV(`SmartSpend_${company}_monthly_${periodLabel.replace(' ', '_')}.csv`,
         ['Month', 'Transactions', 'Income (BHD)', 'Expenses (BHD)', 'Net (BHD)', 'Status'],

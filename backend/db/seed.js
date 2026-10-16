@@ -8,15 +8,17 @@ const bcrypt = require('bcryptjs');
 const { seedDefaultCategories } = require('../routes/categories');
 const { detectAnomalies } = require('../lib/anomalies');
 
-const DEMO_EMAILS = ['owner@alzain.bh', 'admin@alzain.bh', 'accountant@alzain.bh', 'owner@gulftech.bh'];
+const DEMO_EMAILS = ['owner@general.bh', 'admin@general.bh', 'employee@general.bh', 'owner@brighttech.bh',
+  // accounts from earlier versions of the demo data
+  'owner@alzain.bh', 'admin@alzain.bh', 'accountant@alzain.bh', 'owner@gulftech.bh', 'admin@smartspend.bh'];
 
 // [monthsAgo, day, type, amount, description, method, category]
-const AL_ZAIN = [];
+const GENERAL = [];
 for (const ago of [3, 2, 1, 0]) {
-  AL_ZAIN.push(
+  GENERAL.push(
     [ago, 1,  'expense', 850.000,  'Monthly office rent - Manama block 317', 'transfer', 'Rent & Utilities'],
     [ago, 3,  'expense', 2400.000, 'Monthly payroll',                         'transfer', 'Salaries & Wages'],
-    [ago, 5,  'income',  4800.000 + ago * 150, 'Wholesale order - Al-Hawaj Group', 'transfer', 'Product Sales'],
+    [ago, 5,  'income',  4800.000 + ago * 150, 'Wholesale order - City Mart', 'transfer', 'Product Sales'],
     [ago, 8,  'expense', [96.500, 102.000, 91.250, 98.750][ago], 'Delivery van fuel', 'cash', 'Travel & Transport'],
     [ago, 10, 'expense', [310.000, 295.000, 330.000, 320.500][ago], 'Instagram & Google Ads campaign', 'card', 'Marketing & Ads'],
     [ago, 12, 'expense', [45.750, 38.900, 52.300, 41.000][ago], 'Stationery & printer ink', 'cash', 'Office Supplies'],
@@ -28,12 +30,12 @@ for (const ago of [3, 2, 1, 0]) {
   );
 }
 // Two unusual expenses this month — detected by the z-score engine
-AL_ZAIN.push(
+GENERAL.push(
   [0, 13, 'expense', 1450.000, 'Emergency delivery van engine repair', 'card',     'Travel & Transport'],
   [0, 11, 'expense', 2350.000, 'Billboard campaign - Exhibition Road', 'transfer', 'Marketing & Ads'],
 );
 
-const GULF_TECH = [
+const BRIGHT_TECH = [
   [1, 4,  'income',  3200.000, 'Website development project',  'transfer', 'Service Revenue'],
   [1, 6,  'expense', 1800.000, 'Developer salaries',           'transfer', 'Salaries & Wages'],
   [0, 4,  'income',  2750.000, 'Mobile app maintenance contract', 'transfer', 'Service Revenue'],
@@ -86,38 +88,38 @@ async function seed() {
     await client.query('DELETE FROM users WHERE email = ANY($1)', [DEMO_EMAILS]);
     await client.query('DELETE FROM companies WHERE is_demo = TRUE');
 
-    const alZain = await createCompany(client, 'Al-Zain Trading Co.', 'Retail & Trading', 'Manama, Bahrain');
-    const gulfTech = await createCompany(client, 'Gulf Tech Solutions', 'Information Technology', 'Seef, Bahrain');
+    const general = await createCompany(client, 'General Trading Co.', 'Retail & Trading', 'Manama, Bahrain');
+    const brightTech = await createCompany(client, 'Bright Tech Solutions', 'Information Technology', 'Seef, Bahrain');
 
     const owner = await bcrypt.hash('owner123', 10);
     const admin = await bcrypt.hash('admin123', 10);
     const emp = await bcrypt.hash('emp123', 10);
     const { rows: users } = await client.query(
       `INSERT INTO users (name, email, password_hash, role, company_id, avatar) VALUES
-         ('Ahmed Al-Zain',      'owner@alzain.bh',      $1, 'owner',    $4, 'AA'),
-         ('Khalid Al-Mansoori', 'admin@alzain.bh',      $2, 'admin',    $4, 'KA'),
-         ('Fatima Hassan',      'accountant@alzain.bh', $3, 'employee', $4, 'FH'),
-         ('Sara Al-Dossari',    'owner@gulftech.bh',    $1, 'owner',    $5, 'SA')
+         ('Alex Morgan', 'owner@general.bh',    $1, 'owner',    $4, 'AM'),
+         ('Max Carter',  'admin@general.bh',    $2, 'admin',    $4, 'MC'),
+         ('Clara Hayes', 'employee@general.bh', $3, 'employee', $4, 'CH'),
+         ('Sam Wilson',  'owner@brighttech.bh', $1, 'owner',    $5, 'SW')
        RETURNING id, email`,
-      [owner, admin, emp, alZain, gulfTech]);
+      [owner, admin, emp, general, brightTech]);
     const uid = Object.fromEntries(users.map(u => [u.email, u.id]));
 
-    const cat = await addTransactions(client, alZain, uid['owner@alzain.bh'], AL_ZAIN);
-    await addTransactions(client, gulfTech, uid['owner@gulftech.bh'], GULF_TECH);
+    const cat = await addTransactions(client, general, uid['owner@general.bh'], GENERAL);
+    await addTransactions(client, brightTech, uid['owner@brighttech.bh'], BRIGHT_TECH);
 
     const now = new Date();
     for (const [name, amount] of BUDGETS) {
       await client.query(
         'INSERT INTO budgets (amount, month, year, category_id, company_id) VALUES ($1, $2, $3, $4, $5)',
-        [amount, now.getMonth() + 1, now.getFullYear(), cat[name], alZain]);
+        [amount, now.getMonth() + 1, now.getFullYear(), cat[name], general]);
     }
 
-    await detectAnomalies(alZain, client);
-    await detectAnomalies(gulfTech, client);
+    await detectAnomalies(general, client);
+    await detectAnomalies(brightTech, client);
 
     await client.query('COMMIT');
-    console.log('✅ Demo data ready. Logins: owner@alzain.bh / owner123, admin@alzain.bh / admin123, '
-      + 'accountant@alzain.bh / emp123, owner@gulftech.bh / owner123');
+    console.log('✅ Demo data ready. Logins: owner@general.bh / owner123, admin@general.bh / admin123, '
+      + 'employee@general.bh / emp123, owner@brighttech.bh / owner123');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Seed failed:', err.message);

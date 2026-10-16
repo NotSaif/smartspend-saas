@@ -15,9 +15,9 @@ export const ROLES = {
 export const BUDGET_ALERT_PCT = 90;
 
 export const DEMO_ACCOUNTS = [
-  { role: 'Business Owner', label: 'Owner',    email: 'owner@alzain.bh',      password: 'owner123', color: 'emerald' },
-  { role: 'Administrator',  label: 'Admin',    email: 'admin@alzain.bh',      password: 'admin123', color: 'brand' },
-  { role: 'Employee',       label: 'Employee', email: 'accountant@alzain.bh', password: 'emp123',   color: 'amber' },
+  { role: 'Business Owner', label: 'Owner',    email: 'owner@general.bh',    password: 'owner123', color: 'emerald' },
+  { role: 'Administrator',  label: 'Admin',    email: 'admin@general.bh',    password: 'admin123', color: 'brand' },
+  { role: 'Employee',       label: 'Employee', email: 'employee@general.bh', password: 'emp123',   color: 'amber' },
 ];
 
 export const fmtBHD = (n) => `BHD ${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
