@@ -1,106 +1,130 @@
+/**
+ * Demo data for SmartSpend. Running it again resets the two demo companies.
+ * Transactions cover the current month and the three months before it, so the
+ * dashboard always has data, and include two unusual expenses for the anomaly engine.
+ */
 const pool = require('./pool');
 const bcrypt = require('bcryptjs');
+const { seedDefaultCategories } = require('../routes/categories');
+const { detectAnomalies } = require('../lib/anomalies');
+
+const DEMO_EMAILS = ['owner@alzain.bh', 'admin@alzain.bh', 'accountant@alzain.bh', 'owner@gulftech.bh'];
+
+// [monthsAgo, day, type, amount, description, method, category]
+const AL_ZAIN = [];
+for (const ago of [3, 2, 1, 0]) {
+  AL_ZAIN.push(
+    [ago, 1,  'expense', 850.000,  'Monthly office rent - Manama block 317', 'transfer', 'Rent & Utilities'],
+    [ago, 3,  'expense', 2400.000, 'Monthly payroll',                         'transfer', 'Salaries & Wages'],
+    [ago, 5,  'income',  4800.000 + ago * 150, 'Wholesale order - Al-Hawaj Group', 'transfer', 'Product Sales'],
+    [ago, 8,  'expense', [96.500, 102.000, 91.250, 98.750][ago], 'Delivery van fuel', 'cash', 'Travel & Transport'],
+    [ago, 10, 'expense', [310.000, 295.000, 330.000, 320.500][ago], 'Instagram & Google Ads campaign', 'card', 'Marketing & Ads'],
+    [ago, 12, 'expense', [45.750, 38.900, 52.300, 41.000][ago], 'Stationery & printer ink', 'cash', 'Office Supplies'],
+    [ago, 14, 'income',  [2100.000, 1900.000, 2250.000, 2050.000][ago], 'Retail walk-in sales', 'cash', 'Product Sales'],
+    [ago, 18, 'expense', 120.000,  'Cloud accounting & email subscriptions', 'card', 'IT & Software'],
+    [ago, 20, 'expense', [285.000, 300.000, 275.500, 305.000][ago], 'Flyer printing & social media boosts', 'card', 'Marketing & Ads'],
+    [ago, 22, 'expense', [104.000, 92.000, 107.500, 99.000][ago], 'Delivery van fuel', 'cash', 'Travel & Transport'],
+    [ago, 25, 'income',  [750.000, 650.000, 700.000, 900.000][ago], 'Installation service fee', 'card', 'Service Revenue'],
+  );
+}
+// Two unusual expenses this month — detected by the z-score engine
+AL_ZAIN.push(
+  [0, 13, 'expense', 1450.000, 'Emergency delivery van engine repair', 'card',     'Travel & Transport'],
+  [0, 11, 'expense', 2350.000, 'Billboard campaign - Exhibition Road', 'transfer', 'Marketing & Ads'],
+);
+
+const GULF_TECH = [
+  [1, 4,  'income',  3200.000, 'Website development project',  'transfer', 'Service Revenue'],
+  [1, 6,  'expense', 1800.000, 'Developer salaries',           'transfer', 'Salaries & Wages'],
+  [0, 4,  'income',  2750.000, 'Mobile app maintenance contract', 'transfer', 'Service Revenue'],
+  [0, 6,  'expense', 1800.000, 'Developer salaries',           'transfer', 'Salaries & Wages'],
+  [0, 9,  'expense', 240.000,  'Cloud hosting',                'card',     'IT & Software'],
+];
+
+const BUDGETS = [
+  ['Salaries & Wages', 2500], ['Rent & Utilities', 900], ['Marketing & Ads', 600],
+  ['Travel & Transport', 400], ['Office Supplies', 80], ['IT & Software', 150],
+];
+
+function dateFor(monthsAgo, day) {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  // keep this month's records in the past
+  const maxDay = monthsAgo === 0 ? Math.max(1, now.getDate()) : lastDay;
+  const dd = Math.min(day, maxDay);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+}
+
+async function createCompany(client, name, industry, location) {
+  const { rows: [c] } = await client.query(
+    'INSERT INTO companies (name, industry, location, is_demo) VALUES ($1, $2, $3, TRUE) RETURNING id',
+    [name, industry, location]);
+  await seedDefaultCategories(c.id, client);
+  return c.id;
+}
+
+async function addTransactions(client, companyId, userId, list) {
+  const { rows } = await client.query('SELECT id, name FROM categories WHERE company_id = $1', [companyId]);
+  const cat = Object.fromEntries(rows.map(r => [r.name, r.id]));
+  for (const [ago, day, type, amount, description, method, category] of list) {
+    await client.query(
+      `INSERT INTO transactions (amount, date, type, description, payment_method, category_id, company_id, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [amount, dateFor(ago, day), type, description, method, cat[category], companyId, userId]);
+  }
+  return cat;
+}
 
 async function seed() {
   const client = await pool.connect();
   try {
-    console.log('🌱 Seeding database...');
+    console.log('🌱 Seeding demo data...');
     await client.query('BEGIN');
 
-    // Companies
-    const { rows: [co1] } = await client.query(`
-      INSERT INTO companies (name, industry, location, is_demo)
-      VALUES ('Al-Zain Trading Co.', 'Retail & Trading', 'Manama', true)
-      ON CONFLICT DO NOTHING RETURNING id`);
-    const { rows: [co2] } = await client.query(`
-      INSERT INTO companies (name, industry, location, is_demo)
-      VALUES ('Gulf Tech Solutions', 'Information Technology', 'Seef', true)
-      ON CONFLICT DO NOTHING RETURNING id`);
+    // Reset previous demo data (users are removed with their company)
+    await client.query('DELETE FROM users WHERE email = ANY($1)', [DEMO_EMAILS]);
+    await client.query('DELETE FROM companies WHERE is_demo = TRUE');
 
-    const companyId = co1?.id || 1;
+    const alZain = await createCompany(client, 'Al-Zain Trading Co.', 'Retail & Trading', 'Manama, Bahrain');
+    const gulfTech = await createCompany(client, 'Gulf Tech Solutions', 'Information Technology', 'Seef, Bahrain');
 
-    // Users
-    const ownerHash = await bcrypt.hash('owner123', 10);
-    const adminHash = await bcrypt.hash('admin123', 10);
-    const empHash   = await bcrypt.hash('emp123',   10);
+    const owner = await bcrypt.hash('owner123', 10);
+    const admin = await bcrypt.hash('admin123', 10);
+    const emp = await bcrypt.hash('emp123', 10);
+    const { rows: users } = await client.query(
+      `INSERT INTO users (name, email, password_hash, role, company_id, avatar) VALUES
+         ('Ahmed Al-Zain',      'owner@alzain.bh',      $1, 'owner',    $4, 'AA'),
+         ('Khalid Al-Mansoori', 'admin@alzain.bh',      $2, 'admin',    $4, 'KA'),
+         ('Fatima Hassan',      'accountant@alzain.bh', $3, 'employee', $4, 'FH'),
+         ('Sara Al-Dossari',    'owner@gulftech.bh',    $1, 'owner',    $5, 'SA')
+       RETURNING id, email`,
+      [owner, admin, emp, alZain, gulfTech]);
+    const uid = Object.fromEntries(users.map(u => [u.email, u.id]));
 
-    await client.query(`
-      INSERT INTO users (name, email, password_hash, role, company_id, avatar)
-      VALUES
-        ('Ahmed Al-Zain',       'owner@alzain.bh',      $1, 'owner',    $4, 'AZ'),
-        ('Fatima Hassan',       'accountant@alzain.bh', $3, 'employee', $4, 'FH'),
-        ('Khalid Al-Mansoori', 'admin@smartspend.bh',  $2, 'admin',    NULL,'KM'),
-        ('Sara Al-Dossari',    'owner@gulftech.bh',    $1, 'owner',    $5, 'SD')
-      ON CONFLICT (email) DO NOTHING`,
-      [ownerHash, adminHash, empHash, companyId, co2?.id || 2]
-    );
+    const cat = await addTransactions(client, alZain, uid['owner@alzain.bh'], AL_ZAIN);
+    await addTransactions(client, gulfTech, uid['owner@gulftech.bh'], GULF_TECH);
 
-    // Categories
-    const catResult = await client.query(`
-      INSERT INTO categories (name, type, color, icon, company_id) VALUES
-        ('Salaries & Wages',  'expense', '#EF4444', '👥', $1),
-        ('Rent & Utilities',  'expense', '#F59E0B', '🏢', $1),
-        ('Marketing & Ads',   'expense', '#8B5CF6', '📣', $1),
-        ('Inventory & Stock', 'expense', '#EC4899', '📦', $1),
-        ('Transportation',    'expense', '#06B6D4', '🚗', $1),
-        ('Office Supplies',   'expense', '#84CC16', '✏️', $1),
-        ('Product Sales',     'income',  '#10B981', '💰', $1),
-        ('Service Revenue',   'income',  '#3B82F6', '🔧', $1),
-        ('Consulting Fees',   'income',  '#2563EB', '💼', $1)
-      ON CONFLICT DO NOTHING RETURNING id`,
-      [companyId]
-    );
-    const cats = catResult.rows;
-
-    if (cats.length > 0) {
-      // Transactions (April 2026 sample data)
-      const today = new Date();
-      const getDate = (d) => { const dt = new Date(today); dt.setDate(dt.getDate()-d); return dt.toISOString().split('T')[0]; };
-
-      await client.query(`
-        INSERT INTO transactions (amount, date, type, description, payment_method, category_id, company_id, user_id)
-        SELECT t.amount, t.date::date, t.type, t.description, t.payment_method,
-               (SELECT id FROM categories WHERE company_id=$1 LIMIT 1 OFFSET t.cat_offset),
-               $1,
-               (SELECT id FROM users WHERE company_id=$1 LIMIT 1)
-        FROM (VALUES
-          (4500.000, '${getDate(2)}',  'income',  'Wholesale order - Al-Hawaj Group',    'transfer', 6),
-          (1200.000, '${getDate(3)}',  'expense', 'Monthly payroll - part 1',             'transfer', 0),
-          (850.000,  '${getDate(4)}',  'expense', 'April office rent - Manama block 317', 'transfer', 1),
-          (320.500,  '${getDate(5)}',  'expense', 'Instagram & Google Ads campaign',      'card',     2),
-          (2100.000, '${getDate(6)}',  'income',  'Retail walk-in sales - Week 2',        'cash',     6),
-          (1850.000, '${getDate(7)}',  'expense', 'Restocking - household goods',         'transfer', 3),
-          (95.000,   '${getDate(8)}',  'expense', 'Delivery van fuel - April',            'cash',     4),
-          (750.000,  '${getDate(9)}',  'income',  'Installation service fee',             'card',     7),
-          (45.750,   '${getDate(10)}', 'expense', 'Stationery & printer ink',             'cash',     5),
-          (600.000,  '${getDate(12)}', 'income',  'Business advisory - Tamkeen workshop', 'transfer', 8)
-        ) AS t(amount, date, type, description, payment_method, cat_offset)
-        ON CONFLICT DO NOTHING`,
-        [companyId]
-      );
-
-      // Budgets
-      const m = today.getMonth() + 1;
-      const y = today.getFullYear();
-      const budgetAmounts = [2500, 1100, 400, 2000, 150, 80];
-      for (let i = 0; i < Math.min(cats.length, 6); i++) {
-        await client.query(`
-          INSERT INTO budgets (amount, month, year, category_id, company_id)
-          VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
-          [budgetAmounts[i], m, y, cats[i].id, companyId]
-        );
-      }
+    const now = new Date();
+    for (const [name, amount] of BUDGETS) {
+      await client.query(
+        'INSERT INTO budgets (amount, month, year, category_id, company_id) VALUES ($1, $2, $3, $4, $5)',
+        [amount, now.getMonth() + 1, now.getFullYear(), cat[name], alZain]);
     }
 
+    await detectAnomalies(alZain, client);
+    await detectAnomalies(gulfTech, client);
+
     await client.query('COMMIT');
-    console.log('✅ Database seeded successfully.');
+    console.log('✅ Demo data ready. Logins: owner@alzain.bh / owner123, admin@alzain.bh / admin123, '
+      + 'accountant@alzain.bh / emp123, owner@gulftech.bh / owner123');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Seed failed:', err.message);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     client.release();
-    pool.end();
+    await pool.end();
   }
 }
 

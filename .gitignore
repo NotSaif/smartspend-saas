@@ -26,3 +26,6 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Tesseract OCR language data (downloaded at runtime)
+*.traineddata

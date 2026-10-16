@@ -1,125 +1,110 @@
 /**
  * SmartSpend API Service Layer
- * Centralises all HTTP calls to the backend.
- * Automatically attaches JWT token from localStorage.
+ * Centralises all HTTP calls to the backend and attaches the JWT from localStorage.
  */
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const TOKEN_KEY = 'smartspend_token';
 
-// ── Helpers ───────────────────────────────────────────────────
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
 
-const getToken = () => localStorage.getItem('smartspend_token');
-
-const headers = () => ({
-  'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
-});
-
-const request = async (method, path, body) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: headers(),
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
-  const data = await res.json();
-
-  // Global 401 handler — token expired or invalid
-  if (res.status === 401 && path !== '/auth/login') {
-    localStorage.removeItem('smartspend_token');
-    sessionStorage.removeItem('smartspend_user');
-    window.location.href = '/login';
-    return;
+const send = async (path, options, isAuthCall) => {
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, options);
+  } catch {
+    throw new Error('Cannot reach the SmartSpend server. Please check your connection and try again.');
   }
+  let data = {};
+  try { data = await res.json(); } catch { /* empty or non-JSON body */ }
 
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  // Expired or invalid session → back to the login page
+  if (res.status === 401 && !isAuthCall) {
+    setToken(null);
+    window.location.href = '/login';
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 };
 
-// ── Auth ──────────────────────────────────────────────────────
+const request = (method, path, body) => send(path, {
+  method,
+  headers: {
+    'Content-Type': 'application/json',
+    ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+  },
+  ...(body ? { body: JSON.stringify(body) } : {}),
+}, path === '/auth/login' || path === '/auth/register');
 
+const query = (params) => {
+  const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v != null));
+  const s = new URLSearchParams(clean).toString();
+  return s ? `?${s}` : '';
+};
+
+// ── Auth ──────────────────────────────────────────────────────
 export const authAPI = {
-  login:          (email, password)              => request('POST', '/auth/login',           { email, password }),
-  register:       (payload)                      => request('POST', '/auth/register',         payload),
+  login:          (email, password)              => request('POST', '/auth/login', { email, password }),
+  register:       (payload)                      => request('POST', '/auth/register', payload),
   me:             ()                             => request('GET',  '/auth/me'),
-  updateProfile:  (name, email)                  => request('PUT',  '/auth/profile',          { name, email }),
-  changePassword: (currentPassword, newPassword) => request('POST', '/auth/change-password',  { currentPassword, newPassword }),
+  updateProfile:  (name, email)                  => request('PUT',  '/auth/profile', { name, email }),
+  changePassword: (currentPassword, newPassword) => request('POST', '/auth/change-password', { currentPassword, newPassword }),
 };
 
 // ── Transactions ──────────────────────────────────────────────
-
 export const transactionsAPI = {
-  getAll:  (params = {}) => request('GET',    '/transactions?' + new URLSearchParams(params)),
-  getById: (id)          => request('GET',    `/transactions/${id}`),
-  create:  (data)        => request('POST',   '/transactions',       data),
+  getAll:  (params = {}) => request('GET',    '/transactions' + query(params)),
+  create:  (data)        => request('POST',   '/transactions', data),
   update:  (id, data)    => request('PUT',    `/transactions/${id}`, data),
   delete:  (id)          => request('DELETE', `/transactions/${id}`),
 };
 
 // ── Budgets ───────────────────────────────────────────────────
-
 export const budgetsAPI = {
-  getAll:  (params = {}) => request('GET',    '/budgets?' + new URLSearchParams(params)),
-  create:  (data)        => request('POST',   '/budgets',       data),
+  getAll:  (params = {}) => request('GET',    '/budgets' + query(params)),
+  create:  (data)        => request('POST',   '/budgets', data),
   update:  (id, data)    => request('PUT',    `/budgets/${id}`, data),
   delete:  (id)          => request('DELETE', `/budgets/${id}`),
 };
 
 // ── Categories ────────────────────────────────────────────────
-
 export const categoriesAPI = {
-  getAll:  ()        => request('GET',    '/categories'),
-  create:  (data)    => request('POST',   '/categories',       data),
-  update:  (id, d)   => request('PUT',    `/categories/${id}`, d),
-  delete:  (id)      => request('DELETE', `/categories/${id}`),
+  getAll:  ()      => request('GET',    '/categories'),
+  create:  (data)  => request('POST',   '/categories', data),
+  update:  (id, d) => request('PUT',    `/categories/${id}`, d),
+  delete:  (id)    => request('DELETE', `/categories/${id}`),
 };
 
-// ── Users (admin) ─────────────────────────────────────────────
-
+// ── Users (Business Owner) ────────────────────────────────────
 export const usersAPI = {
-  getAll:  ()        => request('GET',    '/users'),
-  create:  (data)    => request('POST',   '/users',       data),
-  update:  (id, d)   => request('PUT',    `/users/${id}`, d),
-  delete:  (id)      => request('DELETE', `/users/${id}`),
+  getAll:  ()      => request('GET',    '/users'),
+  create:  (data)  => request('POST',   '/users', data),
+  update:  (id, d) => request('PUT',    `/users/${id}`, d),
+  delete:  (id)    => request('DELETE', `/users/${id}`),
 };
 
-// ── Companies (admin) ─────────────────────────────────────────
-
-export const companiesAPI = {
-  getAll:  ()        => request('GET',    '/companies'),
-  create:  (data)    => request('POST',   '/companies',       data),
-  update:  (id, d)   => request('PUT',    `/companies/${id}`, d),
-  delete:  (id)      => request('DELETE', `/companies/${id}`),
-};
-
-// ── Reports ───────────────────────────────────────────────────
-
-export const reportsAPI = {
-  monthly:    (year)          => request('GET', `/reports/monthly?year=${year}`),
-  byCategory: (year, month)   => request('GET', `/reports/by-category?year=${year}${month ? `&month=${month}` : ''}`),
-  summary:    (month, year)   => request('GET', `/reports/summary?month=${month}&year=${year}`),
+// ── Company profile ───────────────────────────────────────────
+export const companyAPI = {
+  get:    ()     => request('GET', '/companies/me'),
+  update: (data) => request('PUT', '/companies/me', data),
 };
 
 // ── Anomaly Detection ─────────────────────────────────────────
-
 export const anomaliesAPI = {
   getAll: () => request('GET', '/anomalies'),
 };
 
-// ── Receipt OCR ───────────────────────────────────────────────
-// Uses FormData (multipart) — no Content-Type header so browser sets boundary.
-
+// ── Receipt OCR (multipart — the browser sets the Content-Type boundary) ──
 export const receiptsAPI = {
   ocr: (file) => {
     const formData = new FormData();
     formData.append('receipt', file);
-    return fetch(`${BASE_URL}/receipts/ocr`, {
+    return send('/receipts/ocr', {
       method: 'POST',
       headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
       body: formData,
-    }).then(async (res) => {
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'OCR failed');
-      return data;
-    });
+    }, false);
   },
 };

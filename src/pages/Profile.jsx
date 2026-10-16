@@ -2,24 +2,41 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Shield, Building2, LogOut, Key, Save, CheckCircle, AlertCircle } from 'lucide-react';
-import { ROLES } from '../data/mockData';
-import { authAPI } from '../services/api';
+import { ROLES } from '../data/constants';
+import { authAPI, companyAPI } from '../services/api';
 import { toast } from '../components/Toast';
 
 export default function Profile() {
-  const { currentUser, logout, updateCurrentUser } = useAuth();
+  const { currentUser, logout, updateCurrentUser, isOwner } = useAuth();
+  const [company, setCompany] = useState({ name: '', industry: '', location: '' });
+  const [companySaving, setCompanySaving] = useState(false);
+  const [companyError, setCompanyError] = useState('');
+
+  useEffect(() => {
+    companyAPI.get()
+      .then(res => setCompany({ name: res.data.name || '', industry: res.data.industry || '', location: res.data.location || '' }))
+      .catch(() => {});
+  }, []);
+
+  const handleCompanySave = async (e) => {
+    e.preventDefault();
+    setCompanyError('');
+    setCompanySaving(true);
+    try {
+      const res = await companyAPI.update(company);
+      updateCurrentUser({ companyName: res.data.name });
+      toast.success('Company profile saved.');
+    } catch (err) {
+      setCompanyError(err.message);
+    } finally {
+      setCompanySaving(false);
+    }
+  };
   const navigate = useNavigate();
   const [saved, setSaved]       = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving]     = useState(false);
-  const [form, setForm] = useState({ name: '', email: '' });
-
-  // Sync form when currentUser loads (async JWT verification)
-  useEffect(() => {
-    if (currentUser) {
-      setForm({ name: currentUser.name || '', email: currentUser.email || '' });
-    }
-  }, [currentUser?.id]);
+  const [form, setForm] = useState(() => ({ name: currentUser?.name || '', email: currentUser?.email || '' }));
 
   const [pwForm, setPwForm]   = useState({ current: '', newPass: '', confirm: '' });
   const [pwError, setPwError] = useState('');
@@ -97,16 +114,16 @@ export default function Profile() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { icon: Shield,    label: 'Role',    value: roleInfo.label || currentUser?.role },
-          { icon: Building2, label: 'Company', value: currentUser?.companyId ? `Company #${currentUser.companyId}` : 'All Companies' },
-          { icon: User,      label: 'User ID', value: `#${currentUser?.id}` },
+          { icon: Building2, label: 'Company', value: currentUser?.companyName },
+          { icon: Mail,      label: 'Email',   value: currentUser?.email },
         ].map(({ icon: Icon, label, value }) => (
-          <div key={label} className="glass-card p-4 flex items-center gap-3">
+          <div key={label} className="glass-card p-4 flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-brand-500/15 text-brand-400 flex items-center justify-center flex-shrink-0">
               <Icon size={17} />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-white/30">{label}</p>
-              <p className="text-sm font-semibold text-white">{value}</p>
+              <p className="text-sm font-semibold text-white truncate">{value}</p>
             </div>
           </div>
         ))}
@@ -140,6 +157,40 @@ export default function Profile() {
               {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Changes'}
             </button>
           </div>
+        </form>
+      </div>
+
+      {/* Company profile (UR-02) — editable by the Business Owner */}
+      <div className="glass-card p-6">
+        <h2 className="text-base font-semibold text-white mb-1 flex items-center gap-2">
+          <Building2 size={16} className="text-brand-400" /> Company Profile
+        </h2>
+        <p className="text-xs text-white/40 mb-5">{isOwner ? 'Shown across SmartSpend for everyone in your company.' : 'Only the Business Owner can change these details.'}</p>
+        <form onSubmit={handleCompanySave} className="space-y-4">
+          <div>
+            <label className="text-sm text-white/60 mb-1.5 block">Company Name</label>
+            <input value={company.name} disabled={!isOwner} onChange={e => setCompany(p => ({ ...p, name: e.target.value }))} className="input-field disabled:opacity-60" required />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-white/60 mb-1.5 block">Industry</label>
+              <input value={company.industry} disabled={!isOwner} onChange={e => setCompany(p => ({ ...p, industry: e.target.value }))} className="input-field disabled:opacity-60" />
+            </div>
+            <div>
+              <label className="text-sm text-white/60 mb-1.5 block">Location</label>
+              <input value={company.location} disabled={!isOwner} onChange={e => setCompany(p => ({ ...p, location: e.target.value }))} placeholder="e.g. Manama, Bahrain" className="input-field disabled:opacity-60" />
+            </div>
+          </div>
+          {companyError && (
+            <div className="flex items-center gap-2 text-coral-400 text-sm p-3 bg-coral-500/10 rounded-xl border border-coral-500/20">
+              <AlertCircle size={14} /> {companyError}
+            </div>
+          )}
+          {isOwner && (
+            <button type="submit" disabled={companySaving} className="btn-primary flex items-center gap-2">
+              <Save size={15} /> {companySaving ? 'Saving…' : 'Save Company'}
+            </button>
+          )}
         </form>
       </div>
 

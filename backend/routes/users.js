@@ -3,61 +3,75 @@ const router = express.Router();
 const pool = require('../db/pool');
 const bcrypt = require('bcryptjs');
 const { authenticate, authorize } = require('../middleware/auth');
+const { serverError, badRequest } = require('../lib/http');
 
-router.use(authenticate, authorize('admin'));
+// The Business Owner manages the user accounts of their own company only.
+router.use(authenticate, authorize('owner'));
+
+const ASSIGNABLE_ROLES = ['admin', 'employee'];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const FIELDS = 'id, name, email, role, avatar, is_active, created_at';
+const initials = (name) => name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
 // GET /api/users
 router.get('/', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT u.id, u.name, u.email, u.role, u.company_id, u.avatar, u.is_active, u.created_at,
-              c.name AS company_name, c.is_demo AS company_is_demo
-       FROM users u LEFT JOIN companies c ON c.id = u.company_id
-       ORDER BY u.created_at DESC`
+      `SELECT ${FIELDS} FROM users WHERE company_id = $1 ORDER BY role = 'owner' DESC, created_at`,
+      [req.user.companyId]
     );
     res.json({ success: true, data: rows });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    serverError(res, err);
   }
 });
 
-// POST /api/users
+// POST /api/users — create an Administrator or Employee account in the owner's company
 router.post('/', async (req, res) => {
   try {
-    const { name, email, password, role, companyId } = req.body;
-    if (!name || !email || !password)
-      return res.status(400).json({ success: false, error: 'Name, email, and password are required.' });
-    if (password.length < 6)
-      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters.' });
+    const { name, email, password, role } = req.body;
+    if (!name?.trim() || !email || !password) return badRequest(res, 'Name, email and password are required.');
+    if (!EMAIL_RE.test(email)) return badRequest(res, 'Please enter a valid email address.');
+    if (password.length < 6) return badRequest(res, 'Password must be at least 6 characters.');
+    if (!ASSIGNABLE_ROLES.includes(role)) return badRequest(res, 'Role must be admin or employee.');
 
-    const exists = await pool.query('SELECT id FROM users WHERE email=$1', [email.toLowerCase()]);
-    if (exists.rows.length)
-      return res.status(409).json({ success: false, error: 'Email already in use.' });
+    const mail = email.trim().toLowerCase();
+    const exists = await pool.query('SELECT 1 FROM users WHERE email = $1', [mail]);
+    if (exists.rows.length) return res.status(409).json({ success: false, error: 'Email already in use.' });
 
     const hash = await bcrypt.hash(password, 10);
-    const avatar = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     const { rows } = await pool.query(
-      'INSERT INTO users (name,email,password_hash,role,company_id,avatar) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,name,email,role,company_id,avatar',
-      [name, email.toLowerCase(), hash, role || 'employee', companyId || null, avatar]
+      `INSERT INTO users (name, email, password_hash, role, company_id, avatar)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${FIELDS}`,
+      [name.trim(), mail, hash, role, req.user.companyId, initials(name)]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    serverError(res, err);
   }
 });
 
-// PUT /api/users/:id
+// PUT /api/users/:id — change name, email, role or active status (not of the owner account)
 router.put('/:id', async (req, res) => {
   try {
-    const { name, email, role, companyId, isActive } = req.body;
+    const { name, email, role, isActive } = req.body;
+    if (!name?.trim() || !email) return badRequest(res, 'Name and email are required.');
+    if (!EMAIL_RE.test(email)) return badRequest(res, 'Please enter a valid email address.');
+    if (!ASSIGNABLE_ROLES.includes(role)) return badRequest(res, 'Role must be admin or employee.');
+    if (parseInt(req.params.id) === req.user.id)
+      return badRequest(res, 'Use My Profile to edit your own account.');
+
     const { rows } = await pool.query(
-      'UPDATE users SET name=$1,email=$2,role=$3,company_id=$4,is_active=$5 WHERE id=$6 RETURNING id,name,email,role,company_id,avatar,is_active',
-      [name, email?.toLowerCase(), role, companyId || null, isActive ?? true, req.params.id]
+      `UPDATE users SET name = $1, email = $2, role = $3, is_active = $4, avatar = $5
+       WHERE id = $6 AND company_id = $7 AND role <> 'owner' RETURNING ${FIELDS}`,
+      [name.trim(), email.trim().toLowerCase(), role, isActive !== false, initials(name),
+       req.params.id, req.user.companyId]
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'User not found.' });
     res.json({ success: true, data: rows[0] });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    if (err.code === '23505') return badRequest(res, 'That email is already in use.');
+    serverError(res, err);
   }
 });
 
@@ -65,12 +79,15 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     if (parseInt(req.params.id) === req.user.id)
-      return res.status(400).json({ success: false, error: 'Cannot delete your own account.' });
-    const { rows } = await pool.query('DELETE FROM users WHERE id=$1 RETURNING id', [req.params.id]);
+      return badRequest(res, 'You cannot delete your own account.');
+    const { rows } = await pool.query(
+      `DELETE FROM users WHERE id = $1 AND company_id = $2 AND role <> 'owner' RETURNING id`,
+      [req.params.id, req.user.companyId]
+    );
     if (!rows.length) return res.status(404).json({ success: false, error: 'User not found.' });
     res.json({ success: true, message: 'User deleted.' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    serverError(res, err);
   }
 });
 

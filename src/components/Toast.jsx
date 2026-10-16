@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle, AlertTriangle, X } from 'lucide-react';
 
 let toastListeners = [];
+// eslint-disable-next-line react-refresh/only-export-components
 export const toast = {
   success: (msg) => toastListeners.forEach(fn => fn({ type: 'success', msg })),
   warning: (msg) => toastListeners.forEach(fn => fn({ type: 'warning', msg })),

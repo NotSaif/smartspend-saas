@@ -2,6 +2,7 @@ require('dotenv').config();
 const express    = require('express');
 const cors       = require('cors');
 const rateLimit  = require('express-rate-limit');
+const multer     = require('multer');
 
 const authRoutes         = require('./routes/auth');
 const transactionRoutes  = require('./routes/transactions');
@@ -28,7 +29,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Security headers
@@ -57,7 +58,8 @@ const apiLimiter = rateLimit({
 });
 
 // ── Routes ────────────────────────────────────────────────────
-app.use('/api/auth/login',   loginLimiter);
+app.use('/api/auth/login',    loginLimiter);
+app.use('/api/auth/register', loginLimiter);
 app.use('/api',              apiLimiter);
 app.use('/api/auth',         authRoutes);
 app.use('/api/transactions', transactionRoutes);
@@ -80,11 +82,17 @@ app.use((req, res) => {
 });
 
 // ── Global error handler ──────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({
+  if (err instanceof multer.MulterError) {
+    const msg = err.code === 'LIMIT_FILE_SIZE' ? 'Image is larger than 5 MB.' : err.message;
+    return res.status(400).json({ success: false, error: msg });
+  }
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error(err.stack);
+  res.status(status).json({
     success: false,
-    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
+    error: status < 500 || process.env.NODE_ENV !== 'production' ? err.message : 'Internal server error',
   });
 });
 

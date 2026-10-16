@@ -10,47 +10,32 @@ import Budgets       from './pages/Budgets';
 import Reports       from './pages/Reports';
 import Categories    from './pages/Categories';
 import Users         from './pages/Users';
-import Companies     from './pages/Companies';
 import Profile       from './pages/Profile';
 import NotFound      from './pages/NotFound';
 
-function AppRoutes() {
+const page = (element, roles) => (
+  <ProtectedRoute allowedRoles={roles}><Layout>{element}</Layout></ProtectedRoute>
+);
+
+export default function App() {
   const { currentUser } = useAuth();
+  const guestOnly = (element) => (currentUser ? <Navigate to="/dashboard" replace /> : element);
+
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={currentUser ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/"         element={<LandingPage />} />
+      <Route path="/login"    element={guestOnly(<Login mode="login" />)} />
+      <Route path="/register" element={guestOnly(<Login mode="register" />)} />
 
-      <Route path="/dashboard" element={
-        <ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>
-      }/>
-      <Route path="/transactions" element={
-        <ProtectedRoute><Layout><Transactions /></Layout></ProtectedRoute>
-      }/>
-      <Route path="/budgets" element={
-        <ProtectedRoute allowedRoles={['owner','admin']}><Layout><Budgets /></Layout></ProtectedRoute>
-      }/>
-      <Route path="/reports" element={
-        <ProtectedRoute allowedRoles={['owner','admin']}><Layout><Reports /></Layout></ProtectedRoute>
-      }/>
-      <Route path="/categories" element={
-        <ProtectedRoute allowedRoles={['admin', 'owner']}><Layout><Categories /></Layout></ProtectedRoute>
-      }/>
-      <Route path="/users" element={
-        <ProtectedRoute allowedRoles={['admin']}><Layout><Users /></Layout></ProtectedRoute>
-      }/>
-      <Route path="/companies" element={
-        <ProtectedRoute allowedRoles={['admin']}><Layout><Companies /></Layout></ProtectedRoute>
-      }/>
-      <Route path="/profile" element={
-        <ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>
-      }/>
+      <Route path="/dashboard"    element={page(<Dashboard />)} />
+      <Route path="/transactions" element={page(<Transactions />)} />
+      <Route path="/budgets"      element={page(<Budgets />,    ['owner', 'admin'])} />
+      <Route path="/reports"      element={page(<Reports />,    ['owner', 'admin'])} />
+      <Route path="/categories"   element={page(<Categories />, ['owner', 'admin'])} />
+      <Route path="/users"        element={page(<Users />,      ['owner'])} />
+      <Route path="/profile"      element={page(<Profile />)} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
-}
-
-export default function App() {
-  return <AppRoutes />;
 }

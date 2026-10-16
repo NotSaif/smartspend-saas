@@ -1,66 +1,60 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { users, DEMO_CREDENTIALS } from '../data/mockData';
-import { authAPI } from '../services/api';
+import { authAPI, getToken, setToken } from '../services/api';
 
 const AuthContext = createContext(null);
 
-// Toggle: set to true once backend is running
-const USE_REAL_API = import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== 'http://localhost:5000/api'
-  ? true : false;
-
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(getToken()));
 
+  // Restore the session from a stored token
   useEffect(() => {
-    const initAuth = async () => {
-      const token = localStorage.getItem('smartspend_token');
-      const stored = sessionStorage.getItem('smartspend_user');
-      if (token) {
-        try {
-          const res = await authAPI.me();
-          setCurrentUser(res.user);
-        } catch {
-          localStorage.removeItem('smartspend_token');
-        }
-      } else if (stored) {
-        setCurrentUser(JSON.parse(stored));
-      }
-      setLoading(false);
-    };
-    initAuth();
+    if (!getToken()) return;
+    authAPI.me()
+      .then(res => setCurrentUser(res.user))
+      .catch(() => setToken(null))
+      .finally(() => setLoading(false));
   }, []);
+
+  const startSession = (res) => {
+    setToken(res.token);
+    setCurrentUser(res.user);
+    return { success: true };
+  };
 
   const login = async (email, password) => {
     try {
-      const res = await authAPI.login(email, password);
-      localStorage.setItem('smartspend_token', res.token);
-      setCurrentUser(res.user);
-      return { success: true };
-    } catch (apiErr) {
-      return { success: false, error: apiErr.message || 'Invalid email or password.' };
+      return startSession(await authAPI.login(email, password));
+    } catch (err) {
+      return { success: false, error: err.message || 'Invalid email or password.' };
+    }
+  };
+
+  const register = async (payload) => {
+    try {
+      return startSession(await authAPI.register(payload));
+    } catch (err) {
+      return { success: false, error: err.message || 'Registration failed.' };
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('smartspend_token');
-    sessionStorage.removeItem('smartspend_user');
+    setToken(null);
     setCurrentUser(null);
   };
 
-  const updateCurrentUser = (updated) => {
-    setCurrentUser(prev => ({ ...prev, ...updated }));
+  const updateCurrentUser = (updated) => setCurrentUser(prev => ({ ...prev, ...updated }));
+
+  const role = currentUser?.role;
+  const value = {
+    currentUser, loading, login, register, logout, updateCurrentUser,
+    isOwner: role === 'owner',
+    isAdmin: role === 'admin',
+    canEdit: role === 'owner' || role === 'admin', // create / edit / delete financial data
   };
 
-  const isAdmin  = currentUser?.role === 'admin';
-  const isOwner  = currentUser?.role === 'owner';
-  const canEdit  = currentUser?.role === 'owner' || currentUser?.role === 'admin';
-
-  return (
-    <AuthContext.Provider value={{ currentUser, login, logout, updateCurrentUser, loading, isAdmin, isOwner, canEdit }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

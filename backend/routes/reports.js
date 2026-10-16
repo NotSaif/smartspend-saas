@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
 const { authenticate, authorize } = require('../middleware/auth');
+const { serverError } = require('../lib/http');
 
 router.use(authenticate, authorize('owner', 'admin'));
 
@@ -26,7 +27,7 @@ router.get('/monthly', async (req, res) => {
     );
     res.json({ success: true, data: rows });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    serverError(res, err);
   }
 });
 
@@ -50,7 +51,7 @@ router.get('/by-category', async (req, res) => {
     const { rows } = await pool.query(query, params);
     res.json({ success: true, data: rows });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    serverError(res, err);
   }
 });
 
@@ -74,7 +75,7 @@ router.get('/summary', async (req, res) => {
         SELECT SUM(b.amount) AS total_budget,
                SUM(COALESCE(
                  (SELECT SUM(t.amount) FROM transactions t
-                  WHERE t.category_id=b.category_id AND t.type='expense'
+                  WHERE t.category_id=b.category_id AND t.company_id=b.company_id AND t.type='expense'
                   AND EXTRACT(MONTH FROM t.date)=$2 AND EXTRACT(YEAR FROM t.date)=$3),
                  0
                )) AS total_spent
@@ -99,7 +100,7 @@ router.get('/summary', async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    serverError(res, err);
   }
 });
 
