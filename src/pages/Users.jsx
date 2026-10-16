@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, X, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, Users as UsersIcon, ShieldCheck, Eye } from 'lucide-react';
+import { PageHeader, Modal, FormError } from '../components/ui';
 import { ROLES } from '../data/constants';
 import { usersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -69,24 +70,20 @@ export default function Users() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">User Management</h1>
-          <p className="text-white/40 text-sm mt-1">{users.length} users in {currentUser?.companyName}</p>
-        </div>
-        <button onClick={openAdd} className="btn-primary flex items-center justify-center gap-2"><Plus size={16} />Add User</button>
-      </div>
+      <PageHeader kicker="Team" title="User Management" subtitle={`${users.length} users in ${currentUser?.companyName}`}>
+        <button onClick={openAdd} className="btn-primary"><Plus size={16} />Add User</button>
+      </PageHeader>
 
       {loading ? (
         <div className="flex items-center justify-center h-40 text-white/40">Loading…</div>
       ) : (
-        <div className="glass-card overflow-hidden">
+        <div className="glass-card overflow-hidden animate-rise">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-white/5">
-                <tr className="text-white/30 text-xs uppercase tracking-wide">
+              <thead className="table-head">
+                <tr>
                   {['User', 'Email', 'Role', 'Status', 'Actions'].map(h => (
-                    <th key={h} className={`px-4 py-3 font-medium ${h === 'Actions' ? 'text-right' : 'text-left'}`}>{h}</th>
+                    <th key={h} className={`px-5 py-4 font-semibold ${h === 'Actions' ? 'text-right' : 'text-left'}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -95,27 +92,27 @@ export default function Users() {
                   const isOwner = u.role === 'owner';
                   return (
                     <tr key={u.id} className={`table-row ${u.is_active ? '' : 'opacity-50'}`}>
-                      <td className="px-4 py-3">
+                      <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-emerald-500 flex items-center justify-center text-xs font-bold flex-shrink-0">{u.avatar}</div>
+                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-cyan-500 text-xs font-bold shadow-glow">{u.avatar}</div>
                           <span className="font-medium text-white whitespace-nowrap">{u.name}{u.id === currentUser?.id && <span className="text-white/30 font-normal"> (you)</span>}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-white/50">{u.email}</td>
-                      <td className="px-4 py-3"><span className={`badge border text-xs whitespace-nowrap ${ROLES[u.role]?.color}`}>{ROLES[u.role]?.label}</span></td>
-                      <td className="px-4 py-3">
-                        {isOwner ? <span className="text-xs text-emerald-400">Active</span> : (
+                      <td className="px-5 py-3.5 text-white/50">{u.email}</td>
+                      <td className="px-5 py-3.5"><span className={`chip whitespace-nowrap ${ROLES[u.role]?.color}`}>{ROLES[u.role]?.label}</span></td>
+                      <td className="px-5 py-3.5">
+                        {isOwner ? <span className="chip border-emerald-400/30 text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />Active</span> : (
                           <button onClick={() => toggleActive(u)} title={u.is_active ? 'Deactivate' : 'Reactivate'}
-                            className={`text-xs px-2 py-0.5 rounded-full border ${u.is_active ? 'text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10' : 'text-white/50 border-white/20 hover:bg-white/5'}`}>
-                            {u.is_active ? 'Active' : 'Inactive'}
+                            className={`chip transition-colors ${u.is_active ? 'border-emerald-400/30 text-emerald-300 hover:bg-emerald-500/10' : 'border-white/20 text-white/50 hover:bg-white/5'}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${u.is_active ? 'bg-emerald-400' : 'bg-white/40'}`} />{u.is_active ? 'Active' : 'Inactive'}
                           </button>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-5 py-3.5 text-right">
                         {!isOwner && (
                           <div className="flex gap-2 justify-end">
-                            <button onClick={() => openEdit(u)} aria-label="Edit user" className="text-white/30 hover:text-brand-400 transition-colors"><Edit2 size={14} /></button>
-                            <button onClick={() => setConfirmDelete(u)} aria-label="Delete user" className="text-white/30 hover:text-coral-400 transition-colors"><Trash2 size={14} /></button>
+                            <button onClick={() => openEdit(u)} aria-label="Edit user" className="btn-icon hover:!text-brand-300"><Edit2 size={14} /></button>
+                            <button onClick={() => setConfirmDelete(u)} aria-label="Delete user" className="btn-icon hover:!text-coral-400"><Trash2 size={14} /></button>
                           </div>
                         )}
                       </td>
@@ -128,58 +125,58 @@ export default function Users() {
         </div>
       )}
 
-      <div className="glass-card p-4 text-xs text-white/50 space-y-1">
-        <p><span className="text-brand-300 font-semibold">Administrator</span> — can add, edit and delete transactions, budgets and categories and view reports, but cannot manage users.</p>
-        <p><span className="text-amber-400 font-semibold">Employee</span> — read-only access to the dashboard and the transaction list.</p>
-        <p>Deactivated users can no longer sign in; their past transactions are kept.</p>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {[
+          { icon: ShieldCheck, c: 'bg-brand-500/20 text-brand-200', t: 'Administrator', d: 'Can add, edit and delete transactions, budgets and categories and view reports, but cannot manage users.' },
+          { icon: Eye, c: 'bg-amber-500/15 text-amber-300', t: 'Employee', d: 'Read-only access to the dashboard and the transaction list.' },
+          { icon: UsersIcon, c: 'bg-white/[0.06] text-white/60', t: 'Deactivated users', d: 'Can no longer sign in; their past transactions are kept.' },
+        ].map(({ icon: Icon, c, t, d }) => (
+          <div key={t} className="glass-card flex gap-3 !rounded-2xl p-4">
+            <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${c}`}><Icon size={16} /></span>
+            <p className="text-xs leading-relaxed text-white/50"><span className="block text-sm font-semibold text-white">{t}</span>{d}</p>
+          </div>
+        ))}
       </div>
 
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModal(false)} />
-          <div className="relative glass-card w-full max-w-md p-6 animate-fadeIn">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-bold text-white">{editing ? 'Edit User' : 'Add User'}</h2>
-              <button onClick={() => setModal(false)} className="text-white/40 hover:text-white" aria-label="Close"><X size={20} /></button>
-            </div>
-            {error && <p className="text-coral-400 text-sm mb-4 p-3 bg-coral-500/10 rounded-xl border border-coral-500/20">{error}</p>}
+        <Modal title={editing ? 'Edit User' : 'Add User'} icon={UsersIcon} onClose={() => setModal(false)}>
+            <FormError>{error}</FormError>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-sm text-white/60 mb-1.5 block">Full Name *</label>
+                <label className="label">Full Name *</label>
                 <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Fatima Hassan" className="input-field" />
               </div>
               <div>
-                <label className="text-sm text-white/60 mb-1.5 block">Email *</label>
+                <label className="label">Email *</label>
                 <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="user@company.bh" className="input-field" />
               </div>
               {!editing && (
                 <div>
-                  <label className="text-sm text-white/60 mb-1.5 block">Temporary Password *</label>
+                  <label className="label">Temporary Password *</label>
                   <input type="text" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} placeholder="At least 6 characters" className="input-field" autoComplete="off" />
                 </div>
               )}
               <div>
-                <label className="text-sm text-white/60 mb-1.5 block">Role</label>
+                <label className="label">Role</label>
                 <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} className="input-field">
                   <option value="admin">{ROLES.admin.label}</option>
                   <option value="employee">{ROLES.employee.label}</option>
                 </select>
               </div>
               {editing && (
-                <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-2.5 rounded-2xl bg-white/[0.04] p-3 text-sm text-white/75 ring-1 ring-inset ring-white/[0.06]">
                   <input type="checkbox" checked={form.isActive} onChange={e => setForm(p => ({ ...p, isActive: e.target.checked }))} className="w-4 h-4 accent-emerald-500" />
                   Account is active
                 </label>
               )}
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setModal(false)} className="btn-ghost flex-1">Cancel</button>
-                <button type="submit" disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-60">
+                <button type="submit" disabled={saving} className="btn-primary flex-1">
                   <Save size={15} />{saving ? 'Saving…' : editing ? 'Update' : 'Add User'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {confirmDelete && (

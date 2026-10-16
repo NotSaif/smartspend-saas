@@ -7,25 +7,47 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import StatCard from '../components/StatCard';
 import BudgetBar from '../components/BudgetBar';
-import { DollarSign, TrendingDown, TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, AlertTriangle, Bell } from 'lucide-react';
+import { PageHeader, Skeleton } from '../components/ui';
+import {
+  DollarSign, TrendingDown, TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, AlertTriangle, Bell, ArrowRight, Sparkles,
+} from 'lucide-react';
 import { MONTH_NAMES, BUDGET_ALERT_PCT, fmtBHD, monthOf, yearOf } from '../data/constants';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
+ChartJS.defaults.font.family = '"Plus Jakarta Sans", Inter, sans-serif';
 
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { labels: { color: 'rgba(255,255,255,0.6)', font: { family: 'Inter', size: 12 } } },
-    tooltip: {
-      backgroundColor: '#0F1F3D', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-      titleColor: '#fff', bodyColor: 'rgba(255,255,255,0.7)',
-      callbacks: { label: (c) => ` ${c.dataset.label || c.label}: ${fmtBHD(c.raw)}` },
-    },
-  },
-  scales: {
-    x: { ticks: { color: 'rgba(255,255,255,0.4)' }, grid: { color: 'rgba(255,255,255,0.03)' } },
-    y: { ticks: { color: 'rgba(255,255,255,0.4)', callback: v => 'BD ' + v }, grid: { color: 'rgba(255,255,255,0.05)' } },
+const tooltip = {
+  backgroundColor: 'rgba(12,14,26,0.95)', borderColor: 'rgba(255,255,255,0.12)', borderWidth: 1,
+  titleColor: '#fff', bodyColor: 'rgba(255,255,255,0.75)', padding: 12, cornerRadius: 12, boxPadding: 6,
+  callbacks: { label: (c) => ` ${c.dataset.label || c.label}: ${fmtBHD(c.raw)}` },
+};
+
+// Vertical gradient fill for a bar dataset
+const gradient = (top, bottom) => (ctx) => {
+  const { chart } = ctx;
+  if (!chart.chartArea) return top;
+  const g = chart.ctx.createLinearGradient(0, chart.chartArea.bottom, 0, chart.chartArea.top);
+  g.addColorStop(0, bottom);
+  g.addColorStop(1, top);
+  return g;
+};
+
+// Writes the month's total spending in the middle of the doughnut
+const centerText = {
+  id: 'centerText',
+  afterDraw(chart, _args, opts) {
+    const { ctx, chartArea } = chart;
+    if (!chartArea || !opts?.value) return;
+    const x = (chartArea.left + chartArea.right) / 2, y = (chartArea.top + chartArea.bottom) / 2;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '600 10px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText('SPENT', x, y - 10);
+    ctx.fillStyle = '#fff';
+    ctx.font = '800 15px "Plus Jakarta Sans", sans-serif';
+    ctx.fillText(opts.value, x, y + 10);
+    ctx.restore();
   },
 };
 
@@ -43,6 +65,12 @@ export default function Dashboard() {
   const prev = getMonthlySummary(prevMonth, prevYear);
   const pctChange = (cur, old) => (old > 0 ? Math.round(((cur - old) / old) * 100) : undefined);
 
+  // Last 6 months, oldest first (sparklines) — the last 4 feed the bar chart
+  const history = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(year, month - 6 + i, 1);
+    return { label: MONTH_NAMES[d.getMonth()].slice(0, 3), ...getMonthlySummary(d.getMonth() + 1, d.getFullYear()) };
+  });
+
   // Budgets of the current month with their spending
   const monthBudgets = budgets
     .filter(b => b.month === month && b.year === year)
@@ -58,97 +86,107 @@ export default function Dashboard() {
 
   // Doughnut — this month's spending by category
   const totals = {};
-    transactions
-      .filter(t => t.type === 'expense' && monthOf(t.date) === month && yearOf(t.date) === year)
-      .forEach(t => { totals[t.categoryId] = (totals[t.categoryId] || 0) + t.amount; });
+  transactions
+    .filter(t => t.type === 'expense' && monthOf(t.date) === month && yearOf(t.date) === year)
+    .forEach(t => { totals[t.categoryId] = (totals[t.categoryId] || 0) + t.amount; });
   const spendCats = categories.filter(c => totals[c.id]).sort((a, b) => totals[b.id] - totals[a.id]);
   const doughnutData = {
     labels: spendCats.map(c => c.name),
     datasets: [{
       data: spendCats.map(c => totals[c.id]),
-      backgroundColor: spendCats.map(c => c.color + 'CC'),
-      borderColor: spendCats.map(c => c.color),
-      borderWidth: 1,
+      backgroundColor: spendCats.map(c => c.color),
+      borderColor: '#0C0E1A', borderWidth: 3, hoverOffset: 8, borderRadius: 6, spacing: 2,
     }],
   };
 
-  // Bar — income vs expenses for the last 4 months
-  const last4 = Array.from({ length: 4 }, (_, i) => {
-    const d = new Date(year, month - 4 + i, 1);
-    return { label: MONTH_NAMES[d.getMonth()].slice(0, 3), ...getMonthlySummary(d.getMonth() + 1, d.getFullYear()) };
-  });
+  const last4 = history.slice(2);
   const barData = {
     labels: last4.map(m => m.label),
     datasets: [
-      { label: 'Income',   data: last4.map(m => m.income),   backgroundColor: '#10B98180', borderColor: '#10B981', borderWidth: 1, borderRadius: 6 },
-      { label: 'Expenses', data: last4.map(m => m.expenses), backgroundColor: '#EF444480', borderColor: '#EF4444', borderWidth: 1, borderRadius: 6 },
+      { label: 'Income', data: last4.map(m => m.income), backgroundColor: gradient('#34D399', 'rgba(16,185,129,0.15)'), borderRadius: 10, borderSkipped: false, maxBarThickness: 34 },
+      { label: 'Expenses', data: last4.map(m => m.expenses), backgroundColor: gradient('#FB7185', 'rgba(244,63,94,0.15)'), borderRadius: 10, borderSkipped: false, maxBarThickness: 34 },
     ],
   };
+  const barOptions = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top', align: 'end', labels: { color: 'rgba(255,255,255,0.6)', usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 16 } },
+      tooltip,
+    },
+    scales: {
+      x: { ticks: { color: 'rgba(255,255,255,0.45)' }, grid: { display: false }, border: { display: false } },
+      y: { ticks: { color: 'rgba(255,255,255,0.35)', callback: v => 'BD ' + v.toLocaleString() }, grid: { color: 'rgba(255,255,255,0.05)' }, border: { display: false } },
+    },
+  };
 
-  const recent = transactions.slice(0, 6); // already sorted newest first by the API
+  const recent = transactions.slice(0, 6); // newest first from the API
 
   if (loading && !transactions.length) {
-    return <div className="flex items-center justify-center h-64 text-white/40">Loading your financial data…</div>;
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-12 w-72" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-36" />)}</div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3"><Skeleton className="h-72 lg:col-span-2" /><Skeleton className="h-72" /></div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Financial Dashboard</h1>
-        <p className="text-white/40 text-sm mt-1">{MONTH_NAMES[month - 1]} {year} · {currentUser?.companyName}</p>
-      </div>
+      <PageHeader kicker={`${MONTH_NAMES[month - 1]} ${year} · ${currentUser?.companyName ?? ''}`} title="Financial Dashboard"
+        subtitle="Your company's money at a glance — updated with every transaction.">
+        {canEdit && <Link to="/transactions" className="btn-primary text-sm">Add transaction <ArrowRight size={15} /></Link>}
+      </PageHeader>
 
       {transactions.length === 0 && (
-        <div className="glass-card p-6 border border-brand-500/30 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="glass-card glow-border flex flex-col gap-4 p-6 sm:flex-row sm:items-center animate-rise">
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-cyan-500 shadow-glow"><Sparkles size={22} /></div>
           <div className="flex-1">
-            <h2 className="font-semibold text-white">Welcome to SmartSpend!</h2>
-            <p className="text-sm text-white/50 mt-1">
+            <h2 className="font-display text-lg font-bold text-white">Welcome to SmartSpend!</h2>
+            <p className="mt-1 text-sm text-white/50">
               Your company has no transactions yet. {canEdit ? 'Add your first income or expense to see your dashboard come to life.' : 'Your Business Owner or Administrator can add transactions.'}
             </p>
           </div>
-          {canEdit && <Link to="/transactions" className="btn-primary text-center">Add a transaction</Link>}
+          {canEdit && <Link to="/transactions" className="btn-primary">Add a transaction</Link>}
         </div>
       )}
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard title="Total Income" value={fmtBHD(income)} icon={TrendingUp} color="green"
-          trend={pctChange(income, prev.income)} subtitle={`vs ${MONTH_NAMES[prevMonth - 1]}`} />
-        <StatCard title="Total Expenses" value={fmtBHD(expenses)} icon={TrendingDown} color="red"
-          trend={pctChange(expenses, prev.expenses)} trendGoodWhenDown subtitle={`vs ${MONTH_NAMES[prevMonth - 1]}`} />
-        <StatCard title="Net Balance" value={fmtBHD(net)} icon={DollarSign} color={net >= 0 ? 'green' : 'red'}
-          subtitle={net >= 0 ? 'Profitable month' : 'Loss this month'} />
-        <StatCard title="Budget Utilised" value={`${budgetPct}%`} icon={Wallet}
-          color={budgetPct >= 100 ? 'red' : budgetPct >= BUDGET_ALERT_PCT ? 'amber' : 'blue'}
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Total Income" value={income} format={fmtBHD} icon={TrendingUp} color="green" delay={0}
+          trend={pctChange(income, prev.income)} subtitle={`vs ${MONTH_NAMES[prevMonth - 1]}`} spark={history.map(m => m.income)} />
+        <StatCard title="Total Expenses" value={expenses} format={fmtBHD} icon={TrendingDown} color="red" delay={60}
+          trend={pctChange(expenses, prev.expenses)} trendGoodWhenDown subtitle={`vs ${MONTH_NAMES[prevMonth - 1]}`} spark={history.map(m => m.expenses)} />
+        <StatCard title="Net Balance" value={net} format={fmtBHD} icon={DollarSign} color={net >= 0 ? 'green' : 'red'} delay={120}
+          subtitle={net >= 0 ? 'Profitable month' : 'Loss this month'} spark={history.map(m => m.net)} />
+        <StatCard title="Budget Utilised" value={budgetPct} format={v => `${Math.round(v)}%`} icon={Wallet} delay={180}
+          color={budgetPct > 100 ? 'red' : budgetPct >= BUDGET_ALERT_PCT ? 'amber' : 'blue'}
           subtitle={totalBudget > 0 ? `${fmtBHD(totalSpent)} of ${fmtBHD(totalBudget)}` : 'No budgets set this month'} />
       </div>
 
       {/* Alerts */}
       {(anomalies.length > 0 || budgetAlerts.length > 0) && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {anomalies.length > 0 && (
-            <div className="glass-card p-5 border border-amber-500/25">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle size={16} className="text-amber-400" />
-                <h2 className="text-base font-semibold text-white">Anomaly Alerts</h2>
-                <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  {anomalies.length} flagged
-                </span>
+            <div className="glass-card overflow-hidden p-5 animate-rise">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-amber-500/[0.12] to-transparent" />
+              <div className="relative mb-1 flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-amber-300 animate-pulse-ring"><AlertTriangle size={17} /></span>
+                <h2 className="section-title">Anomaly Alerts</h2>
+                <span className="badge ml-auto bg-amber-500/15 text-amber-300 ring-1 ring-inset ring-amber-400/30">{anomalies.length} flagged</span>
               </div>
-              <p className="text-xs text-white/40 mb-3">Expenses far above their category's usual amount (z-score above 2)</p>
-              <div className="space-y-2">
+              <p className="relative mb-4 ml-12 text-xs text-white/40">Expenses far above their category's usual amount (z-score above 2)</p>
+              <div className="relative space-y-2">
                 {anomalies.slice(0, 4).map(a => (
-                  <div key={a.id} className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                    <span className="text-xl flex-shrink-0">{a.category_icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{a.description}</p>
+                  <div key={a.id} className="flex items-center gap-3 rounded-2xl border border-amber-400/15 bg-amber-500/[0.06] p-3 transition-colors hover:border-amber-400/30">
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xl">{a.category_icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-white">{a.description}</p>
                       <p className="text-xs text-white/40">{a.category_name} · {a.date}</p>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold text-amber-400">{fmtBHD(a.amount)}</p>
-                      <p className="text-xs text-white/40">
-                        {a.z_score ? `z = ${a.z_score}` : `${a.ratio}× avg`} · avg {fmtBHD(a.avg_amount)}
-                      </p>
+                    <div className="flex-shrink-0 text-right">
+                      <p className="num text-sm font-bold text-amber-300">{fmtBHD(a.amount)}</p>
+                      <p className="text-xs text-white/40">{a.z_score ? `z = ${a.z_score}` : `${a.ratio}× avg`} · avg {fmtBHD(a.avg_amount)}</p>
                     </div>
                   </div>
                 ))}
@@ -156,24 +194,26 @@ export default function Dashboard() {
             </div>
           )}
           {budgetAlerts.length > 0 && (
-            <div className="glass-card p-5 border border-coral-500/25">
-              <div className="flex items-center gap-2 mb-3">
-                <Bell size={16} className="text-coral-400" />
-                <h2 className="text-base font-semibold text-white">Budget Alerts</h2>
-                <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-coral-500/20 text-coral-400 border border-coral-500/30">
-                  {budgetAlerts.length} at {BUDGET_ALERT_PCT}%+
-                </span>
+            <div className="glass-card overflow-hidden p-5 animate-rise [animation-delay:60ms]">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-coral-500/[0.12] to-transparent" />
+              <div className="relative mb-1 flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-coral-500/20 text-coral-300"><Bell size={17} /></span>
+                <h2 className="section-title">Budget Alerts</h2>
+                <span className="badge ml-auto bg-coral-500/15 text-coral-300 ring-1 ring-inset ring-coral-400/30">{budgetAlerts.length} at {BUDGET_ALERT_PCT}%+</span>
               </div>
-              <p className="text-xs text-white/40 mb-3">Categories that have used at least {BUDGET_ALERT_PCT}% of this month's budget</p>
-              <div className="space-y-2">
+              <p className="relative mb-4 ml-12 text-xs text-white/40">Categories that have used at least {BUDGET_ALERT_PCT}% of this month's budget</p>
+              <div className="relative space-y-2">
                 {budgetAlerts.map(b => (
-                  <div key={b.id} className="flex items-center gap-3 p-3 rounded-xl bg-coral-500/5 border border-coral-500/10">
-                    <span className="text-xl flex-shrink-0">{b.category.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{b.category.name}</p>
-                      <p className="text-xs text-white/40">{fmtBHD(b.spent)} of {fmtBHD(b.amount)}</p>
+                  <div key={b.id} className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3">
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-xl">{b.category.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-white">{b.category.name}</p>
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                        <div className={`h-1.5 rounded-full bg-gradient-to-r ${b.pct > 100 ? 'from-coral-500 to-coral-400' : 'from-amber-500 to-amber-300'}`} style={{ width: `${Math.min(b.pct, 100)}%` }} />
+                      </div>
+                      <p className="mt-1 text-xs text-white/40">{fmtBHD(b.spent)} of {fmtBHD(b.amount)}</p>
                     </div>
-                    <span className={`text-sm font-bold ${b.pct > 100 ? 'text-coral-400' : 'text-amber-400'}`}>
+                    <span className={`num text-sm font-bold ${b.pct > 100 ? 'text-coral-300' : 'text-amber-300'}`}>
                       {Math.round(b.pct)}%{b.pct > 100 ? ' · Over' : ''}
                     </span>
                   </div>
@@ -185,29 +225,38 @@ export default function Dashboard() {
       )}
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 glass-card p-6">
-          <h2 className="text-base font-semibold text-white mb-4">Income vs Expenses — Last 4 Months</h2>
-          <div className="h-56"><Bar data={barData} options={chartOptions} /></div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="glass-card p-6 lg:col-span-2 animate-rise">
+          <p className="kicker">Cash flow</p>
+          <h2 className="section-title mt-1">Income vs Expenses — Last 4 Months</h2>
+          <div className="mt-4 h-64"><Bar data={barData} options={barOptions} /></div>
         </div>
-        <div className="glass-card p-6">
-          <h2 className="text-base font-semibold text-white mb-4">Spending by Category</h2>
-          <div className="h-56 flex items-center justify-center">
+        <div className="glass-card p-6 animate-rise [animation-delay:60ms]">
+          <p className="kicker">This month</p>
+          <h2 className="section-title mt-1">Spending by Category</h2>
+          <div className="mt-4 flex h-64 items-center justify-center">
             {doughnutData.labels.length ? (
-              <Doughnut data={doughnutData} options={{
-                ...chartOptions, scales: undefined, cutout: '65%',
-                plugins: { ...chartOptions.plugins, legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,0.5)', font: { size: 10 }, padding: 10, boxWidth: 10 } } },
+              <Doughnut data={doughnutData} plugins={[centerText]} options={{
+                responsive: true, maintainAspectRatio: false, cutout: '72%',
+                plugins: {
+                  centerText: { value: fmtBHD(expenses) },
+                  tooltip,
+                  legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,0.55)', font: { size: 10 }, padding: 10, boxWidth: 8, usePointStyle: true, pointStyle: 'circle' } },
+                },
               }} />
-            ) : <p className="text-sm text-white/30">No expenses this month</p>}
+            ) : <p className="text-sm text-white/35">No expenses this month</p>}
           </div>
         </div>
       </div>
 
       {/* Budget status */}
       {monthBudgets.length > 0 && (
-        <div>
-          <h2 className="text-base font-semibold text-white mb-3">Budget Status — {MONTH_NAMES[month - 1]}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="animate-rise">
+          <div className="mb-3 flex items-end justify-between">
+            <div><p className="kicker">Spending limits</p><h2 className="section-title mt-1">Budget Status — {MONTH_NAMES[month - 1]}</h2></div>
+            {canEdit && <Link to="/budgets" className="text-xs font-semibold text-brand-300 hover:text-brand-200">Manage budgets →</Link>}
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {monthBudgets.map(b => <BudgetBar key={b.id} category={b.category} spent={b.spent} budget={b.amount} />)}
           </div>
         </div>
@@ -215,43 +264,25 @@ export default function Dashboard() {
 
       {/* Recent transactions */}
       {recent.length > 0 && (
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-white">Recent Transactions</h2>
-            <Link to="/transactions" className="text-xs text-brand-300 hover:text-brand-400">View all →</Link>
+        <div className="glass-card p-6 animate-rise">
+          <div className="mb-4 flex items-end justify-between">
+            <div><p className="kicker">Activity</p><h2 className="section-title mt-1">Recent Transactions</h2></div>
+            <Link to="/transactions" className="text-xs font-semibold text-brand-300 hover:text-brand-200">View all →</Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-white/30 text-xs uppercase tracking-wide border-b border-white/5">
-                  <th className="text-left pb-3 font-medium">Date</th>
-                  <th className="text-left pb-3 font-medium">Description</th>
-                  <th className="text-left pb-3 font-medium">Category</th>
-                  <th className="text-left pb-3 font-medium hidden sm:table-cell">Method</th>
-                  <th className="text-right pb-3 font-medium">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map(t => (
-                  <tr key={t.id} className="table-row">
-                    <td className="py-3 text-white/40 whitespace-nowrap">{t.date}</td>
-                    <td className="py-3 text-white/80 max-w-[200px] truncate">{t.description}</td>
-                    <td className="py-3">
-                      <span className="text-xs px-2 py-1 rounded-full whitespace-nowrap" style={{ background: (t.categoryColor || '#888') + '20', color: t.categoryColor || '#888' }}>
-                        {t.categoryIcon} {t.categoryName || 'Uncategorised'}
-                      </span>
-                    </td>
-                    <td className="py-3 text-white/40 capitalize hidden sm:table-cell">{t.paymentMethod}</td>
-                    <td className="py-3 text-right font-semibold whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1 ${t.type === 'income' ? 'text-emerald-400' : 'text-coral-400'}`}>
-                        {t.type === 'income' ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-                        {fmtBHD(t.amount)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-1">
+            {recent.map(t => (
+              <div key={t.id} className="flex items-center gap-3 rounded-2xl px-2 py-2.5 transition-colors hover:bg-white/[0.03]">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-lg" style={{ background: (t.categoryColor || '#888') + '22' }}>{t.categoryIcon}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">{t.description}</p>
+                  <p className="text-xs text-white/40">{t.categoryName || 'Uncategorised'} · <span className="capitalize">{t.paymentMethod}</span> · {t.date}</p>
+                </div>
+                <span className={`num inline-flex items-center gap-1 whitespace-nowrap text-sm font-bold ${t.type === 'income' ? 'text-emerald-300' : 'text-coral-300'}`}>
+                  {t.type === 'income' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                  {fmtBHD(t.amount)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}

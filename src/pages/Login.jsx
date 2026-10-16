@@ -2,13 +2,20 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { DEMO_ACCOUNTS } from '../data/constants';
-import { TrendingUp, Eye, EyeOff, LogIn, ArrowLeft, Building2 } from 'lucide-react';
+import { AuroraBackground, Logo } from '../components/ui';
+import { Eye, EyeOff, LogIn, ArrowLeft, Building2, AlertTriangle, ScanLine, ShieldCheck, Sparkles } from 'lucide-react';
 
 const demoColors = {
-  emerald: 'border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400',
-  brand:   'border-brand-500/30 hover:bg-brand-500/10 text-brand-400',
-  amber:   'border-amber-500/30 hover:bg-amber-500/10 text-amber-400',
+  emerald: 'border-emerald-400/25 hover:bg-emerald-500/10 text-emerald-300',
+  brand:   'border-brand-400/30 hover:bg-brand-500/10 text-brand-300',
+  amber:   'border-amber-400/25 hover:bg-amber-500/10 text-amber-300',
 };
+
+const highlights = [
+  { icon: AlertTriangle, title: 'Anomaly detection', desc: 'Unusual expenses flagged by a z-score engine.', c: 'text-amber-300 bg-amber-500/15' },
+  { icon: ScanLine,      title: 'Receipt scanning',  desc: 'Vendor, total and date read from a photo.',   c: 'text-cyan-300 bg-cyan-500/15' },
+  { icon: ShieldCheck,   title: 'Private by design', desc: 'Each company\'s data is fully isolated.',     c: 'text-emerald-300 bg-emerald-500/15' },
+];
 
 export default function Login({ mode = 'login' }) {
   const isRegister = mode === 'register';
@@ -40,103 +47,123 @@ export default function Login({ mode = 'login' }) {
   };
 
   return (
-    <div className="min-h-screen bg-navy-900 flex items-center justify-center p-4">
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="relative grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+      <AuroraBackground intensity="strong" />
 
-      <div className="relative w-full max-w-md py-8">
-        <Link to="/" className="inline-flex items-center gap-2 text-white/40 hover:text-white text-sm transition-colors mb-6">
-          <ArrowLeft size={15} /> Back to home
-        </Link>
-
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500 to-emerald-500 flex items-center justify-center mb-4 glow-blue">
-            <TrendingUp size={28} className="text-white" />
+      {/* Brand panel */}
+      <div className="relative hidden flex-col justify-between overflow-hidden border-r border-white/[0.06] p-12 lg:flex">
+        <Link to="/"><Logo size={40} /></Link>
+        <div className="max-w-md">
+          <span className="chip border-white/10 bg-white/[0.05] text-white/70"><Sparkles size={13} className="text-brand-300" /> SME finance, reimagined</span>
+          <h2 className="mt-6 font-display text-5xl font-extrabold leading-[1.05] tracking-[-0.03em] text-white">
+            Know where every <span className="text-gradient-animated">dinar</span> goes.
+          </h2>
+          <p className="mt-4 text-white/50">Track income and expenses, set budgets and let SmartSpend point out what needs your attention.</p>
+          <div className="mt-10 space-y-3">
+            {highlights.map(({ icon: Icon, title, desc, c }, i) => (
+              <div key={title} className="glass-card flex items-center gap-4 !rounded-2xl p-4 animate-rise" style={{ animationDelay: `${120 + i * 90}ms` }}>
+                <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${c}`}><Icon size={18} /></span>
+                <div><p className="text-sm font-semibold text-white">{title}</p><p className="text-xs text-white/45">{desc}</p></div>
+              </div>
+            ))}
           </div>
-          <h1 className="text-2xl font-bold text-white">{isRegister ? 'Register your company' : 'Welcome back'}</h1>
-          <p className="text-white/40 text-sm mt-1">
+        </div>
+        <p className="text-xs text-white/30">SmartSpend · SME Financial Management · Bahrain 🇧🇭</p>
+      </div>
+
+      {/* Form panel */}
+      <div className="relative flex items-center justify-center p-4 sm:p-8">
+        <div className="w-full max-w-md py-8 animate-rise">
+          <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm text-white/45 transition-colors hover:text-white">
+            <ArrowLeft size={15} /> Back to home
+          </Link>
+          <div className="mb-6 lg:hidden"><Logo size={40} /></div>
+
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-white">{isRegister ? 'Register your company' : 'Welcome back'}</h1>
+          <p className="mb-8 mt-2 text-sm text-white/45">
             {isRegister ? 'Create a SmartSpend account for your business' : 'Sign in to SmartSpend'}
           </p>
-        </div>
 
-        <div className="glass-card p-6 sm:p-8">
-          {error && (
-            <div className="mb-4 p-3 rounded-xl border border-coral-500/30 bg-coral-500/10 text-coral-400 text-sm">{error}</div>
-          )}
+          <div className="glass-strong glow-border p-6 sm:p-8">
+            {error && (
+              <div className="mb-5 rounded-2xl border border-coral-500/25 bg-coral-500/10 px-4 py-3 text-sm text-coral-300 animate-pop">{error}</div>
+            )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {isRegister && (
-              <>
-                <div>
-                  <label className="text-sm text-white/60 mb-1.5 block">Company Name *</label>
-                  <div className="relative">
-                    <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-                    <input value={form.companyName} onChange={set('companyName')} placeholder="e.g. Al-Noor Bakery" className="input-field pl-9" required />
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {isRegister && (
+                <>
+                  <div>
+                    <label className="label">Company Name *</label>
+                    <div className="relative">
+                      <Building2 size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+                      <input value={form.companyName} onChange={set('companyName')} placeholder="e.g. Al-Noor Bakery" className="input-field pl-10" required />
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <label className="text-sm text-white/60 mb-1.5 block">Industry</label>
-                  <input value={form.industry} onChange={set('industry')} placeholder="e.g. Food & Beverage" className="input-field" />
-                </div>
-                <div>
-                  <label className="text-sm text-white/60 mb-1.5 block">Your Full Name *</label>
-                  <input value={form.name} onChange={set('name')} placeholder="e.g. Mona Ali" className="input-field" autoComplete="name" required />
-                </div>
-              </>
-            )}
-            <div>
-              <label className="text-sm text-white/60 mb-1.5 block">Email Address{isRegister && ' *'}</label>
-              <input type="email" value={form.email} onChange={set('email')} placeholder="you@company.bh"
-                className="input-field" autoComplete="email" required />
-            </div>
-            <div>
-              <label className="text-sm text-white/60 mb-1.5 block">Password{isRegister && ' *'}</label>
-              <div className="relative">
-                <input type={showPass ? 'text' : 'password'} value={form.password} onChange={set('password')}
-                  placeholder={isRegister ? 'At least 6 characters' : '••••••••'} className="input-field pr-10"
-                  autoComplete={isRegister ? 'new-password' : 'current-password'} required />
-                <button type="button" onClick={() => setShowPass(p => !p)} aria-label="Show password"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white transition-colors">
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-            {isRegister && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="label">Industry</label>
+                      <input value={form.industry} onChange={set('industry')} placeholder="e.g. Food & Beverage" className="input-field" />
+                    </div>
+                    <div>
+                      <label className="label">Your Full Name *</label>
+                      <input value={form.name} onChange={set('name')} placeholder="e.g. Mona Ali" className="input-field" autoComplete="name" required />
+                    </div>
+                  </div>
+                </>
+              )}
               <div>
-                <label className="text-sm text-white/60 mb-1.5 block">Confirm Password *</label>
-                <input type={showPass ? 'text' : 'password'} value={form.confirm} onChange={set('confirm')}
-                  placeholder="Repeat password" className="input-field" autoComplete="new-password" required />
+                <label className="label">Email Address{isRegister && ' *'}</label>
+                <input type="email" value={form.email} onChange={set('email')} placeholder="you@company.bh"
+                  className="input-field" autoComplete="email" required />
+              </div>
+              <div>
+                <label className="label">Password{isRegister && ' *'}</label>
+                <div className="relative">
+                  <input type={showPass ? 'text' : 'password'} value={form.password} onChange={set('password')}
+                    placeholder={isRegister ? 'At least 6 characters' : '••••••••'} className="input-field pr-11"
+                    autoComplete={isRegister ? 'new-password' : 'current-password'} required />
+                  <button type="button" onClick={() => setShowPass(p => !p)} aria-label="Show password"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/35 transition-colors hover:text-white">
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              {isRegister && (
+                <div>
+                  <label className="label">Confirm Password *</label>
+                  <input type={showPass ? 'text' : 'password'} value={form.confirm} onChange={set('confirm')}
+                    placeholder="Repeat password" className="input-field" autoComplete="new-password" required />
+                </div>
+              )}
+
+              <button type="submit" disabled={loading} className="btn-primary mt-2 w-full py-3.5">
+                {loading
+                  ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  : isRegister ? <><Building2 size={16} /> Create Account</> : <><LogIn size={16} /> Sign In</>}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-white/45">
+              {isRegister
+                ? <>Already have an account? <Link to="/login" className="font-semibold text-brand-300 hover:text-brand-200">Sign in</Link></>
+                : <>New to SmartSpend? <Link to="/register" className="font-semibold text-brand-300 hover:text-brand-200">Register your company</Link></>}
+            </p>
+
+            {!isRegister && (
+              <div className="mt-6 border-t border-white/[0.06] pt-6">
+                <p className="mb-3 text-center text-xs text-white/35">Quick demo access — Al-Zain Trading Co.</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {DEMO_ACCOUNTS.map(({ label, email, password, color }) => (
+                    <button key={label} type="button" onClick={() => quickFill(email, password)}
+                      className={`rounded-xl border bg-white/[0.03] px-3 py-2.5 text-xs font-semibold transition-all ${demoColors[color]}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
-
-            <button type="submit" disabled={loading} className="btn-primary w-full py-3 flex items-center justify-center gap-2 mt-2 disabled:opacity-60">
-              {loading
-                ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : isRegister ? <><Building2 size={16} /> Create Account</> : <><LogIn size={16} /> Sign In</>}
-            </button>
-          </form>
-
-          <p className="text-center text-sm text-white/40 mt-5">
-            {isRegister
-              ? <>Already have an account? <Link to="/login" className="text-brand-300 hover:text-brand-400 font-medium">Sign in</Link></>
-              : <>New to SmartSpend? <Link to="/register" className="text-brand-300 hover:text-brand-400 font-medium">Register your company</Link></>}
-          </p>
-
-          {!isRegister && (
-            <div className="mt-5 pt-5 border-t border-white/5">
-              <p className="text-xs text-white/30 mb-3 text-center">Quick demo access — Al-Zain Trading Co.</p>
-              <div className="grid grid-cols-3 gap-2">
-                {DEMO_ACCOUNTS.map(({ label, email, password, color }) => (
-                  <button key={label} type="button" onClick={() => quickFill(email, password)}
-                    className={`text-xs py-2 px-3 rounded-lg border bg-white/3 transition-all ${demoColors[color]}`}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
-
-        <p className="text-center text-xs text-white/20 mt-6">SmartSpend · SME Financial Management · Bahrain 🇧🇭</p>
       </div>
     </div>
   );

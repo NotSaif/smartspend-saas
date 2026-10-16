@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
-import { X, Plus, Save, ScanLine, Loader2, CheckCircle2, AlertCircle, Paperclip } from 'lucide-react';
+import { Plus, Save, ScanLine, Loader2, CheckCircle2, AlertCircle, Paperclip, ArrowLeftRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { PAYMENT_METHODS, todayISO } from '../data/constants';
 import { receiptsAPI } from '../services/api';
+import { Modal, FormError } from './ui';
 
 export default function TransactionModal({ transaction, onClose }) {
   const { categories, saveTransaction } = useApp();
@@ -69,100 +70,94 @@ export default function TransactionModal({ transaction, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative glass-card w-full max-w-lg p-6 animate-fadeIn max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">{isEdit ? 'Edit Transaction' : 'Add Transaction'}</h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors" aria-label="Close"><X size={20} /></button>
+    <Modal title={isEdit ? 'Edit Transaction' : 'Add Transaction'} icon={ArrowLeftRight} onClose={onClose} width="max-w-lg">
+      {/* Receipt scanner */}
+      <div className={`mb-5 rounded-2xl border border-dashed p-4 transition-colors ${ocrLoading ? 'border-cyan-400/50 bg-cyan-500/[0.06]' : 'border-white/15 bg-white/[0.03]'}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-300"><ScanLine size={16} /></span>
+            <span className="text-sm font-semibold text-white">Scan Receipt</span>
+            <span className="rounded-md bg-gradient-to-r from-brand-500/30 to-cyan-500/30 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/80">OCR</span>
+          </div>
+          <button type="button" disabled={ocrLoading} onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 rounded-xl bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-cyan-200 ring-1 ring-inset ring-white/10 transition-colors hover:bg-white/[0.1] disabled:opacity-50">
+            {ocrLoading ? <><Loader2 size={12} className="animate-spin" /> Scanning…</> : <><Paperclip size={12} /> Upload Image</>}
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/bmp" className="hidden" onChange={handleFileSelect} />
         </div>
-
-        {/* Receipt scanner */}
-        <div className="mb-5 p-4 rounded-xl border border-dashed border-white/15 bg-white/3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <ScanLine size={15} className="text-brand-400" />
-              <span className="text-sm font-semibold text-white">Scan Receipt</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 font-bold uppercase tracking-wide">OCR</span>
-            </div>
-            <button type="button" disabled={ocrLoading} onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand-500/15 text-brand-300 hover:bg-brand-500/25 transition-colors disabled:opacity-50">
-              {ocrLoading ? <><Loader2 size={12} className="animate-spin" /> Scanning…</> : <><Paperclip size={12} /> Upload Image</>}
-            </button>
-            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/bmp" className="hidden" onChange={handleFileSelect} />
+        {ocrError && <div className="mt-3 flex items-center gap-2 text-xs text-coral-300"><AlertCircle size={13} /> {ocrError}</div>}
+        {ocrResult && !ocrError && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-500/[0.08] p-2.5 ring-1 ring-inset ring-emerald-400/20 animate-pop">
+            <CheckCircle2 size={14} className="mt-0.5 flex-shrink-0 text-emerald-400" />
+            <p className="text-xs leading-relaxed text-white/55">
+              Extracted —{' '}
+              {ocrResult.vendor !== 'Unknown Vendor' && <span className="font-semibold text-white/85">{ocrResult.vendor}</span>}
+              {ocrResult.amount && <span className="font-semibold text-white/85"> · BHD {ocrResult.amount.toFixed(3)}</span>}
+              {ocrResult.date && <span className="font-semibold text-white/85"> · {ocrResult.date}</span>}
+              <span className="mt-0.5 block text-white/40">Fields pre-filled below — choose a category and review before saving.</span>
+            </p>
           </div>
-          {ocrError && <div className="flex items-center gap-2 mt-2 text-xs text-coral-400"><AlertCircle size={12} /> {ocrError}</div>}
-          {ocrResult && !ocrError && (
-            <div className="flex items-start gap-2 mt-2">
-              <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-white/50 leading-relaxed">
-                Extracted —{' '}
-                {ocrResult.vendor !== 'Unknown Vendor' && <span className="text-white/70">{ocrResult.vendor}</span>}
-                {ocrResult.amount && <span className="text-white/70"> · BHD {ocrResult.amount.toFixed(3)}</span>}
-                {ocrResult.date && <span className="text-white/70"> · {ocrResult.date}</span>}
-                <span className="block mt-0.5 text-white/30">Fields pre-filled below — choose a category and review before saving.</span>
-              </p>
-            </div>
-          )}
-          {!ocrResult && !ocrError && !ocrLoading && (
-            <p className="text-xs text-white/30 mt-1">Upload a photo of a receipt (JPEG or PNG, max 5 MB) to fill in the amount, date and vendor.</p>
-          )}
-        </div>
-
-        {error && <p className="text-coral-400 text-sm mb-4 p-3 bg-coral-500/10 rounded-xl border border-coral-500/20">{error}</p>}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex gap-2 p-1 bg-navy-700 rounded-xl">
-            {['expense', 'income'].map(t => (
-              <button key={t} type="button" onClick={() => setForm(p => ({ ...p, type: t, categoryId: '' }))}
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${
-                  form.type === t ? (t === 'expense' ? 'bg-coral-500 text-white' : 'bg-emerald-500 text-white') : 'text-white/40 hover:text-white'}`}>
-                {t}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm text-white/60 mb-1.5 block">Amount (BHD) *</label>
-              <input name="amount" type="number" step="0.001" min="0.001" value={form.amount} onChange={handleChange} placeholder="0.000" className="input-field" />
-            </div>
-            <div>
-              <label className="text-sm text-white/60 mb-1.5 block">Date *</label>
-              <input name="date" type="date" max={todayISO()} value={form.date} onChange={handleChange} className="input-field" />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm text-white/60 mb-1.5 block">Category *</label>
-            <select name="categoryId" value={form.categoryId} onChange={handleChange} className="input-field">
-              <option value="">Select {form.type} category…</option>
-              {availableCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm text-white/60 mb-1.5 block">Payment Method *</label>
-            <select name="paymentMethod" value={form.paymentMethod} onChange={handleChange} className="input-field">
-              {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm text-white/60 mb-1.5 block">Description *</label>
-            <input name="description" type="text" maxLength={200} value={form.description} onChange={handleChange}
-              placeholder="e.g. Monthly payroll" className="input-field" />
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancel</button>
-            <button type="submit" disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-60">
-              {isEdit ? <Save size={16} /> : <Plus size={16} />}
-              {saving ? 'Saving…' : isEdit ? 'Update' : 'Add Transaction'}
-            </button>
-          </div>
-        </form>
+        )}
+        {!ocrResult && !ocrError && !ocrLoading && (
+          <p className="mt-2 text-xs text-white/35">Upload a photo of a receipt (JPEG or PNG, max 5 MB) to fill in the amount, date and vendor.</p>
+        )}
       </div>
-    </div>
+
+      <FormError>{error}</FormError>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="relative grid grid-cols-2 rounded-2xl bg-navy-950/60 p-1 ring-1 ring-inset ring-white/[0.08]">
+          {['expense', 'income'].map(t => (
+            <button key={t} type="button" onClick={() => setForm(p => ({ ...p, type: t, categoryId: '' }))}
+              className={`rounded-xl py-2.5 text-sm font-semibold capitalize transition-all duration-300 ${
+                form.type === t
+                  ? (t === 'expense' ? 'bg-gradient-to-r from-coral-500 to-[#E11D48] text-white shadow-[0_6px_20px_-6px_rgba(244,63,94,0.8)]' : 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-[0_6px_20px_-6px_rgba(16,185,129,0.8)]')
+                  : 'text-white/45 hover:text-white'}`}>
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label">Amount (BHD) *</label>
+            <input name="amount" type="number" step="0.001" min="0.001" value={form.amount} onChange={handleChange} placeholder="0.000" className="input-field num" />
+          </div>
+          <div>
+            <label className="label">Date *</label>
+            <input name="date" type="date" max={todayISO()} value={form.date} onChange={handleChange} className="input-field" />
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Category *</label>
+          <select name="categoryId" value={form.categoryId} onChange={handleChange} className="input-field">
+            <option value="">Select {form.type} category…</option>
+            {availableCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="label">Payment Method *</label>
+          <select name="paymentMethod" value={form.paymentMethod} onChange={handleChange} className="input-field">
+            {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="label">Description *</label>
+          <input name="description" type="text" maxLength={200} value={form.description} onChange={handleChange}
+            placeholder="e.g. Monthly payroll" className="input-field" />
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancel</button>
+          <button type="submit" disabled={saving} className="btn-primary flex-1">
+            {isEdit ? <Save size={16} /> : <Plus size={16} />}
+            {saving ? 'Saving…' : isEdit ? 'Update' : 'Add Transaction'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

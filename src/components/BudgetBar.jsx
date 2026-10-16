@@ -7,30 +7,28 @@ export default function BudgetBar({ category, spent, budget }) {
   const over = spent > budget;
   const near = !over && rawPct >= BUDGET_ALERT_PCT;
 
-  const tone = over ? 'coral' : near ? 'amber' : 'emerald';
-  const styles = {
-    coral:   { bar: 'bg-coral-500',   text: 'text-coral-400',   badge: 'bg-coral-500/10 border-coral-500/30' },
-    amber:   { bar: 'bg-amber-500',   text: 'text-amber-400',   badge: 'bg-amber-500/10 border-amber-500/30' },
-    emerald: { bar: 'bg-emerald-500', text: 'text-emerald-400', badge: 'bg-emerald-500/10 border-emerald-500/30' },
-  }[tone];
-  const status = over ? 'Over Budget' : near ? 'Near Limit' : 'On Track';
+  const s = over
+    ? { bar: 'from-coral-500 to-coral-400', glow: 'shadow-[0_0_14px_rgba(251,113,133,0.7)]', text: 'text-coral-300', badge: 'bg-coral-500/[0.12] ring-coral-400/25', label: 'Over Budget' }
+    : near
+      ? { bar: 'from-amber-500 to-amber-300', glow: 'shadow-[0_0_14px_rgba(251,191,36,0.6)]', text: 'text-amber-300', badge: 'bg-amber-500/[0.12] ring-amber-400/25', label: 'Near Limit' }
+      : { bar: 'from-emerald-500 to-cyan-400', glow: 'shadow-[0_0_14px_rgba(52,211,153,0.55)]', text: 'text-emerald-300', badge: 'bg-emerald-500/[0.12] ring-emerald-400/25', label: 'On Track' };
 
   return (
-    <div className="glass-card p-4 hover:border-white/20 transition-all duration-200">
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg">{category.icon}</span>
-          <span className="font-semibold text-white text-sm truncate">{category.name}</span>
+    <div className="glass-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/15">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-lg" style={{ background: (category.color || '#9B83FF') + '22' }}>{category.icon}</span>
+          <span className="truncate text-sm font-semibold text-white">{category.name}</span>
         </div>
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${styles.text} ${styles.badge}`}>{status}</span>
+        <span className={`badge whitespace-nowrap ring-1 ring-inset ${s.text} ${s.badge}`}>{s.label}</span>
       </div>
-      <div className="w-full bg-navy-700 rounded-full h-2.5 mb-2 overflow-hidden">
-        <div className={`${styles.bar} h-2.5 rounded-full transition-all duration-700 ease-out`} style={{ width: `${pct}%` }} />
+      <div className="mb-2.5 h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
+        <div className={`h-2 rounded-full bg-gradient-to-r ${s.bar} ${s.glow} transition-all duration-1000 ease-out`} style={{ width: `${pct}%` }} />
       </div>
-      <div className="flex justify-between text-xs text-white/40 gap-2">
-        <span>Spent: <span className="text-white/70 font-medium">{fmtBHD(spent)}</span></span>
-        <span>Budget: <span className="text-white/70 font-medium">{fmtBHD(budget)}</span></span>
-        <span className={`font-semibold ${styles.text}`}>{Math.round(rawPct)}%</span>
+      <div className="flex justify-between gap-2 text-xs text-white/40">
+        <span>Spent: <span className="num font-semibold text-white/75">{fmtBHD(spent)}</span></span>
+        <span>Budget: <span className="num font-semibold text-white/75">{fmtBHD(budget)}</span></span>
+        <span className={`num font-bold ${s.text}`}>{Math.round(rawPct)}%</span>
       </div>
     </div>
   );

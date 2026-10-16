@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { BarChart3, Download, Printer } from 'lucide-react';
+import { BarChart3, Download, Printer, TrendingUp, TrendingDown, Scale } from 'lucide-react';
+import { PageHeader } from '../components/ui';
 import { MONTH_NAMES, fmtBHD, monthOf, yearOf } from '../data/constants';
 
 // Build a CSV file in the browser and download it (FR-13)
@@ -71,26 +72,22 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Reports & Analytics</h1>
-          <p className="text-white/40 text-sm mt-1">{filtered.length} transactions · {periodLabel}</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1 p-1 bg-navy-800 rounded-xl border border-white/5">
+      <div className="print:hidden">
+        <PageHeader kicker="Analytics" title="Reports & Analytics" subtitle={`${filtered.length} transactions · ${periodLabel}`}>
+          <div className="flex gap-1 rounded-2xl border border-white/10 bg-navy-950/50 p-1">
             {[['monthly', 'Monthly'], ['category', 'By Category']].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === v ? 'bg-brand-500 text-white' : 'text-white/40 hover:text-white'}`}>
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${view === v ? 'bg-gradient-to-r from-brand-500 to-cyan-500 text-white shadow-glow' : 'text-white/45 hover:text-white'}`}>
                 {l}
               </button>
             ))}
           </div>
-          <button onClick={exportCSV} className="btn-primary flex items-center gap-2 text-sm"><Download size={14} /> Export CSV</button>
-          <button onClick={() => window.print()} className="btn-ghost flex items-center gap-2 text-sm"><Printer size={14} /> Print / PDF</button>
-        </div>
+          <button onClick={exportCSV} className="btn-primary text-sm"><Download size={14} /> Export CSV</button>
+          <button onClick={() => window.print()} className="btn-ghost text-sm"><Printer size={14} /> Print / PDF</button>
+        </PageHeader>
       </div>
 
-      <div className="glass-card p-4 flex flex-wrap gap-3 items-center print:hidden">
+      <div className="glass-card flex flex-wrap items-center gap-3 p-4 print:hidden animate-rise">
         <BarChart3 size={16} className="text-white/30" />
         <select value={year} onChange={e => setYear(parseInt(e.target.value))} className="input-field w-auto py-2 text-sm" aria-label="Year">
           {years.map(y => <option key={y} value={y}>{y}</option>)}
@@ -111,51 +108,51 @@ export default function Reports() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Income', val: totalIncome, c: 'text-emerald-400', b: 'border-emerald-500/20' },
-          { label: 'Expenses', val: totalExpenses, c: 'text-coral-400', b: 'border-coral-500/20' },
-          { label: 'Net', val: totalIncome - totalExpenses, c: totalIncome - totalExpenses >= 0 ? 'text-emerald-400' : 'text-coral-400', b: 'border-brand-500/20' },
-        ].map(({ label, val, c, b }) => (
-          <div key={label} className={`glass-card p-5 border ${b}`}>
-            <p className="text-xs text-white/40 mb-1">{periodLabel} {label}</p>
-            <p className={`text-2xl font-bold ${c}`}>{fmtBHD(val)}</p>
+          { label: 'Income', val: totalIncome, c: 'text-emerald-300', chip: 'bg-emerald-500/15 text-emerald-300', icon: TrendingUp },
+          { label: 'Expenses', val: totalExpenses, c: 'text-coral-300', chip: 'bg-coral-500/15 text-coral-300', icon: TrendingDown },
+          { label: 'Net', val: totalIncome - totalExpenses, c: totalIncome - totalExpenses >= 0 ? 'text-emerald-300' : 'text-coral-300', chip: 'bg-brand-500/20 text-brand-200', icon: Scale },
+        ].map(({ label, val, c, chip, icon: Icon }, i) => (
+          <div key={label} className="glass-card flex items-center gap-4 p-5 animate-rise" style={{ animationDelay: `${i * 50}ms` }}>
+            <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${chip}`}><Icon size={19} /></span>
+            <div><p className="text-xs text-white/45">{periodLabel} {label}</p><p className={`num font-display text-2xl font-bold ${c}`}>{fmtBHD(val)}</p></div>
           </div>
         ))}
       </div>
 
       {view === 'monthly' && (
-        <div className="glass-card overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/5">
-            <h2 className="text-base font-semibold text-white">Monthly Summary — {periodLabel}</h2>
+        <div className="glass-card overflow-hidden animate-rise">
+          <div className="border-b border-white/[0.06] px-6 py-5">
+            <h2 className="section-title">Monthly Summary — {periodLabel}</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-white/5">
-                <tr className="text-white/30 text-xs uppercase tracking-wide">
+              <thead className="table-head">
+                <tr>
                   {['Month', 'Transactions', 'Income', 'Expenses', 'Net Balance', 'Status'].map(h => (
-                    <th key={h} className={`px-4 py-3 font-medium ${['Income', 'Expenses', 'Net Balance'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                    <th key={h} className={`px-5 py-4 font-semibold ${['Income', 'Expenses', 'Net Balance'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {months.map(({ name, income, expenses, net, count }) => (
                   <tr key={name} className="table-row">
-                    <td className="px-4 py-3 font-medium text-white">{name}</td>
-                    <td className="px-4 py-3 text-white/40">{count || '—'}</td>
-                    <td className="px-4 py-3 text-right text-emerald-400 font-medium whitespace-nowrap">{income > 0 ? fmtBHD(income) : '—'}</td>
-                    <td className="px-4 py-3 text-right text-coral-400 font-medium whitespace-nowrap">{expenses > 0 ? fmtBHD(expenses) : '—'}</td>
-                    <td className={`px-4 py-3 text-right font-bold whitespace-nowrap ${net >= 0 ? 'text-emerald-400' : 'text-coral-400'}`}>{count > 0 ? fmtBHD(net) : '—'}</td>
-                    <td className="px-4 py-3">
-                      {count > 0 && <span className={`badge border text-xs ${net >= 0 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-coral-400 bg-coral-500/10 border-coral-500/30'}`}>{net >= 0 ? 'Profit' : 'Loss'}</span>}
+                    <td className="px-5 py-3.5 font-medium text-white">{name}</td>
+                    <td className="px-5 py-3.5 text-white/40">{count || '—'}</td>
+                    <td className="px-5 py-3.5 text-right text-emerald-300 font-medium whitespace-nowrap">{income > 0 ? fmtBHD(income) : '—'}</td>
+                    <td className="px-5 py-3.5 text-right text-coral-300 font-medium whitespace-nowrap">{expenses > 0 ? fmtBHD(expenses) : '—'}</td>
+                    <td className={`px-5 py-3.5 text-right font-bold whitespace-nowrap ${net >= 0 ? 'text-emerald-300' : 'text-coral-300'}`}>{count > 0 ? fmtBHD(net) : '—'}</td>
+                    <td className="px-5 py-3.5">
+                      {count > 0 && <span className={`badge ${net >= 0 ? 'text-emerald-300 bg-emerald-500/10 ring-1 ring-inset ring-emerald-400/25' : 'text-coral-300 bg-coral-500/10 ring-1 ring-inset ring-coral-400/25'}`}>{net >= 0 ? 'Profit' : 'Loss'}</span>}
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t border-white/10 bg-white/3">
+              <tfoot className="border-t border-white/10 bg-gradient-to-r from-brand-500/10 to-cyan-500/5">
                 <tr className="font-bold">
-                  <td className="px-4 py-3 text-white" colSpan={2}>Total</td>
-                  <td className="px-4 py-3 text-right text-emerald-400 whitespace-nowrap">{fmtBHD(totalIncome)}</td>
-                  <td className="px-4 py-3 text-right text-coral-400 whitespace-nowrap">{fmtBHD(totalExpenses)}</td>
-                  <td className={`px-4 py-3 text-right whitespace-nowrap ${totalIncome - totalExpenses >= 0 ? 'text-emerald-400' : 'text-coral-400'}`}>{fmtBHD(totalIncome - totalExpenses)}</td>
+                  <td className="px-5 py-3.5 text-white" colSpan={2}>Total</td>
+                  <td className="px-5 py-3.5 text-right text-emerald-300 whitespace-nowrap">{fmtBHD(totalIncome)}</td>
+                  <td className="px-5 py-3.5 text-right text-coral-300 whitespace-nowrap">{fmtBHD(totalExpenses)}</td>
+                  <td className={`px-5 py-3.5 text-right whitespace-nowrap ${totalIncome - totalExpenses >= 0 ? 'text-emerald-300' : 'text-coral-300'}`}>{fmtBHD(totalIncome - totalExpenses)}</td>
                   <td />
                 </tr>
               </tfoot>
@@ -165,16 +162,16 @@ export default function Reports() {
       )}
 
       {view === 'category' && (
-        <div className="glass-card overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/5">
-            <h2 className="text-base font-semibold text-white">Breakdown by Category — {periodLabel}</h2>
+        <div className="glass-card overflow-hidden animate-rise">
+          <div className="border-b border-white/[0.06] px-6 py-5">
+            <h2 className="section-title">Breakdown by Category — {periodLabel}</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-white/5">
-                <tr className="text-white/30 text-xs uppercase tracking-wide">
+              <thead className="table-head">
+                <tr>
                   {['Category', 'Type', 'Transactions', 'Total Amount', 'Share of Type'].map(h => (
-                    <th key={h} className={`px-4 py-3 font-medium ${['Total Amount', 'Share of Type'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                    <th key={h} className={`px-5 py-4 font-semibold ${['Total Amount', 'Share of Type'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -182,13 +179,13 @@ export default function Reports() {
                 {catBreakdown.length === 0 && <tr><td colSpan={5} className="text-center py-10 text-white/30">No transactions in this period</td></tr>}
                 {catBreakdown.map(c => (
                   <tr key={c.id} className="table-row">
-                    <td className="px-4 py-3"><span className="flex items-center gap-2"><span className="text-lg">{c.icon}</span><span className="text-white/80">{c.name}</span></span></td>
-                    <td className="px-4 py-3"><span className={`badge border text-xs ${c.type === 'income' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-coral-400 bg-coral-500/10 border-coral-500/30'}`}>{c.type}</span></td>
-                    <td className="px-4 py-3 text-white/40">{c.count}</td>
-                    <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${c.type === 'income' ? 'text-emerald-400' : 'text-coral-400'}`}>{fmtBHD(c.total)}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-5 py-3.5"><span className="flex items-center gap-2"><span className="text-lg">{c.icon}</span><span className="text-white/80">{c.name}</span></span></td>
+                    <td className="px-5 py-3.5"><span className={`badge ${c.type === 'income' ? 'text-emerald-300 bg-emerald-500/10 ring-1 ring-inset ring-emerald-400/25' : 'text-coral-300 bg-coral-500/10 ring-1 ring-inset ring-coral-400/25'}`}>{c.type}</span></td>
+                    <td className="px-5 py-3.5 text-white/40">{c.count}</td>
+                    <td className={`px-5 py-3.5 text-right font-semibold whitespace-nowrap ${c.type === 'income' ? 'text-emerald-300' : 'text-coral-300'}`}>{fmtBHD(c.total)}</td>
+                    <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <div className="w-16 bg-navy-700 rounded-full h-1.5 overflow-hidden">
+                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/[0.06]">
                           <div className="h-1.5 rounded-full" style={{ width: `${c.share}%`, background: c.color }} />
                         </div>
                         <span className="text-white/40 text-xs w-12 text-right">{c.share.toFixed(1)}%</span>
