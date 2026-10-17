@@ -14,11 +14,19 @@ export const ROLES = {
 // Budget status thresholds (FR-10: alert when spending reaches 90% of the limit)
 export const BUDGET_ALERT_PCT = 90;
 
+// Demo company: General Trading Co. (one user per role)
+export const DEMO_COMPANY = 'General Trading Co.';
 export const DEMO_ACCOUNTS = [
-  { role: 'Business Owner', label: 'Owner',    email: 'owner@general.bh',    password: 'owner123', color: 'emerald' },
-  { role: 'Administrator',  label: 'Admin',    email: 'admin@general.bh',    password: 'admin123', color: 'brand' },
-  { role: 'Employee',       label: 'Employee', email: 'employee@general.bh', password: 'emp123',   color: 'amber' },
+  { name: 'Alex Morgan', role: 'Business Owner', label: 'Owner',    email: 'owner@general.bh',    password: 'owner123', color: 'emerald' },
+  { name: 'Max Carter',  role: 'Administrator',  label: 'Admin',    email: 'admin@general.bh',    password: 'admin123', color: 'brand' },
+  { name: 'Clara Hayes', role: 'Employee',       label: 'Employee', email: 'employee@general.bh', password: 'emp123',   color: 'amber' },
 ];
+
+// A second, separate company — used to show that tenants cannot see each other's data
+export const DEMO_OTHER_ACCOUNT = {
+  name: 'Sam Wilson', role: 'Business Owner', label: 'Owner', company: 'Bright Tech Solutions',
+  email: 'owner@brighttech.bh', password: 'owner123', color: 'cyan',
+};
 
 export const fmtBHD = (n) => `BHD ${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
 

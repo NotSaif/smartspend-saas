@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { DEMO_ACCOUNTS } from '../data/constants';
+import { DEMO_ACCOUNTS, DEMO_COMPANY, DEMO_OTHER_ACCOUNT } from '../data/constants';
 import { AuroraBackground, Logo } from '../components/ui';
-import { Eye, EyeOff, LogIn, ArrowLeft, Building2, AlertTriangle, ScanLine, ShieldCheck, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, LogIn, ArrowLeft, Building2, AlertTriangle, ScanLine, ShieldCheck, Sparkles, ArrowRight } from 'lucide-react';
 
 const demoColors = {
   emerald: 'border-emerald-400/25 hover:bg-emerald-500/10 text-emerald-300',
   brand:   'border-brand-400/30 hover:bg-brand-500/10 text-brand-300',
   amber:   'border-amber-400/25 hover:bg-amber-500/10 text-amber-300',
+  cyan:    'border-cyan-400/30 hover:bg-cyan-500/10 text-cyan-300',
 };
 
 const highlights = [
@@ -151,15 +152,31 @@ export default function Login({ mode = 'login' }) {
 
             {!isRegister && (
               <div className="mt-6 border-t border-white/[0.06] pt-6">
-                <p className="mb-3 text-center text-xs text-white/35">Quick demo access — General Trading Co.</p>
+                <p className="mb-3 text-center text-xs text-white/35">Quick demo access — click a user to fill in their login</p>
+
+                <p className="kicker mb-2 flex items-center gap-1.5 !text-[10px]"><Building2 size={12} /> {DEMO_COMPANY}</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {DEMO_ACCOUNTS.map(({ label, email, password, color }) => (
-                    <button key={label} type="button" onClick={() => quickFill(email, password)}
-                      className={`rounded-xl border bg-white/[0.03] px-3 py-2.5 text-xs font-semibold transition-all ${demoColors[color]}`}>
-                      {label}
+                  {DEMO_ACCOUNTS.map(({ name, role, label, email, password, color }) => (
+                    <button key={label} type="button" onClick={() => quickFill(email, password)} title={`${name} — ${role}`}
+                      className={`rounded-xl border bg-white/[0.03] px-2 py-2.5 text-center transition-all ${demoColors[color]}`}>
+                      <span className="block text-xs font-bold">{label}</span>
+                      <span className="mt-0.5 block truncate text-[11px] text-white/55">{name.split(' ')[0]}</span>
                     </button>
                   ))}
                 </div>
+
+                <div className="my-4 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30">
+                  <span className="h-px flex-1 bg-white/10" /> Another company <span className="h-px flex-1 bg-white/10" />
+                </div>
+                <button type="button" onClick={() => quickFill(DEMO_OTHER_ACCOUNT.email, DEMO_OTHER_ACCOUNT.password)}
+                  className={`flex w-full items-center gap-3 rounded-xl border bg-white/[0.03] px-3 py-2.5 text-left transition-all ${demoColors[DEMO_OTHER_ACCOUNT.color]}`}>
+                  <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-cyan-500/15"><Building2 size={16} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-bold">{DEMO_OTHER_ACCOUNT.company}</span>
+                    <span className="block truncate text-[11px] text-white/55">{DEMO_OTHER_ACCOUNT.name} · {DEMO_OTHER_ACCOUNT.role}</span>
+                  </span>
+                  <ArrowRight size={14} className="flex-shrink-0 opacity-60" />
+                </button>
               </div>
             )}
           </div>

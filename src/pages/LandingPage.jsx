@@ -3,7 +3,7 @@ import {
   ArrowRight, BarChart3, Shield, ScanLine, AlertTriangle, Building2, TrendingUp,
   Sparkles, CheckCircle2, FileSpreadsheet, Bell, UserPlus, Receipt,
 } from 'lucide-react';
-import { DEMO_ACCOUNTS } from '../data/constants';
+import { DEMO_ACCOUNTS, DEMO_COMPANY, DEMO_OTHER_ACCOUNT } from '../data/constants';
 import { AuroraBackground, Logo } from '../components/ui';
 
 const stats = [
@@ -24,6 +24,7 @@ const demoTint = {
   emerald: 'from-emerald-500/20 border-emerald-400/25 text-emerald-300',
   brand:   'from-brand-500/25 border-brand-400/30 text-brand-300',
   amber:   'from-amber-500/20 border-amber-400/25 text-amber-300',
+  cyan:    'from-cyan-500/20 border-cyan-400/30 text-cyan-300',
 };
 
 /* ── A miniature, purely decorative dashboard used as the hero visual ── */
@@ -249,15 +250,28 @@ export default function LandingPage() {
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-500/15 via-transparent to-cyan-500/10" />
           <div className="relative">
             <h2 className="font-display text-3xl font-extrabold tracking-tight text-white">Try the Demo</h2>
-            <p className="mb-8 mt-2 text-sm text-white/50">Explore the demo company General Trading Co. with each access level</p>
+            <p className="mb-8 mt-2 text-sm text-white/50">Explore the demo company {DEMO_COMPANY} with each access level</p>
             <div className="mb-8 grid grid-cols-1 gap-3 text-left md:grid-cols-3">
               {DEMO_ACCOUNTS.map(c => (
                 <div key={c.role} className={`rounded-2xl border bg-gradient-to-br to-transparent p-4 ${demoTint[c.color]}`}>
                   <p className="text-[11px] font-bold uppercase tracking-[0.12em]">{c.role}</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{c.name}</p>
                   <p className="mt-2 break-all font-mono text-xs text-white/80">{c.email}</p>
                   <p className="font-mono text-xs text-white/50">{c.password}</p>
                 </div>
               ))}
+            </div>
+            <div className={`mb-8 flex flex-col gap-3 rounded-2xl border bg-gradient-to-br to-transparent p-4 text-left sm:flex-row sm:items-center ${demoTint[DEMO_OTHER_ACCOUNT.color]}`}>
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-cyan-500/15"><Building2 size={18} /></span>
+              <div className="flex-1">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em]">Another company · {DEMO_OTHER_ACCOUNT.company}</p>
+                <p className="mt-1 text-sm font-semibold text-white">{DEMO_OTHER_ACCOUNT.name} — {DEMO_OTHER_ACCOUNT.role}</p>
+                <p className="text-xs text-white/45">Shows that each company only sees its own data.</p>
+              </div>
+              <div className="font-mono text-xs">
+                <p className="break-all text-white/80">{DEMO_OTHER_ACCOUNT.email}</p>
+                <p className="text-white/50">{DEMO_OTHER_ACCOUNT.password}</p>
+              </div>
             </div>
             <button onClick={() => navigate('/login')} className="btn-primary px-8 py-3.5">Go to Login <ArrowRight size={17} /></button>
           </div>
